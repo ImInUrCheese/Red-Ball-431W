@@ -39,7 +39,7 @@ def seed(table, data, size, engine):
 
             for col in data:
                 value = data[col][i]
-                
+                value = value.strip()
                 row[col] = value
 
             new_entry = table(**row)
@@ -84,13 +84,7 @@ class Helpdesk(Base):
 engine = create_engine("sqlite:///redball.db", echo=True)
 Base.metadata.create_all(engine)
 
-# add what type the field is fro the database
-users_type_map = {
-    "email": str,
-    "password": str
-}
-
-users_data = parse("testdb/Users.csv" , users_type_map) #parses users.csv
+users_data = parse("testdb/Users.csv") #parses users.csv
 users_size = len(users_data['email']) #the amount of entries in users
 
 #hashes the passwords
