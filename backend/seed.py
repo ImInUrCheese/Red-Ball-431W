@@ -3,7 +3,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
 from sqlalchemy import String, create_engine
 import hashlib
 
-def parse(file_path):
+def parse(file_path, type_map):
     columns = {}
 
     with open(file_path, mode="r", newline="", encoding="utf-8-sig") as file:
@@ -14,7 +14,21 @@ def parse(file_path):
 
         for row in data:
             for field in data.fieldnames:
-                columns[field].append(row[field])
+                raw = row[field].strip()
+
+                if raw == "":
+                    value = None
+                else:
+                    converter = type_map.get(field, str)
+
+                    if converter == int:
+                        value = int(raw)
+                    elif converter == float:
+                        value = float(raw)
+                    else:
+                        value = raw  # string
+
+                columns[field].append(value)
 
     return columns
 
@@ -25,7 +39,7 @@ def seed(table, data, size, engine):
 
             for col in data:
                 value = data[col][i]
-                value = value.strip()
+                
                 row[col] = value
 
             new_entry = table(**row)
@@ -45,7 +59,13 @@ class Users(Base):
 engine = create_engine("sqlite:///redball.db", echo=True)
 Base.metadata.create_all(engine)
 
-users_data = parse("testdb/Users.csv") #parses users.csv
+# add what type the field is fro the database
+users_type_map = {
+    "email": str,
+    "password": str
+}
+
+users_data = parse("testdb/Users.csv" , users_type_map) #parses users.csv
 users_size = len(users_data['email']) #the amount of entries in users
 
 #hashes the passwords
