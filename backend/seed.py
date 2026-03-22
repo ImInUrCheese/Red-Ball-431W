@@ -1,6 +1,7 @@
 import csv
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
 from sqlalchemy import String, create_engine
+import hashlib
 
 def parse(file_path):
     columns = {}
@@ -47,5 +48,8 @@ Base.metadata.create_all(engine)
 users_data = parse("testdb/Users.csv") #parses users.csv
 users_size = len(users_data['email']) #the amount of entries in users
 
-seed(Users, users_data, users_size, engine)
+#hashes the passwords
+for i in range(users_size):
+    users_data['password'][i] = hashlib.sha256(users_data['password'][i].encode()).hexdigest()
 
+seed(Users, users_data, users_size, engine)
