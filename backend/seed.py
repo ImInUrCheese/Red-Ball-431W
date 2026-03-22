@@ -1,9 +1,9 @@
 import csv
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
-from sqlalchemy import String, create_engine
+from sqlalchemy import String, Integer, ForeignKey, create_engine
 import hashlib
 
-def parse(file_path):
+def parse(file_path, type_map):
     columns = {}
 
     with open(file_path, mode="r", newline="", encoding="utf-8-sig") as file:
@@ -14,7 +14,21 @@ def parse(file_path):
 
         for row in data:
             for field in data.fieldnames:
-                columns[field].append(row[field])
+                raw = row[field].strip()
+
+                if raw == "":
+                    value = None
+                else:
+                    converter = type_map.get(field, str)
+
+                    if converter == int:
+                        value = int(raw)
+                    elif converter == float:
+                        value = float(raw)
+                    else:
+                        value = raw  # string
+
+                columns[field].append(value)
 
     return columns
 
@@ -42,6 +56,31 @@ class Users(Base):
     email: Mapped[str] = mapped_column(String, primary_key=True)
     password: Mapped[str] = mapped_column(String, nullable=False)
 
+class Bidders(Base):
+    __tablename__ = "bidders"
+
+    email: Mapped[str] = mapped_column(String, ForeignKey("users.email"), primary_key=True)
+    first_name: Mapped[str] = mapped_column(String, nullable=False)
+    last_name: Mapped[str] = mapped_column(String, nullable=False)
+    age: Mapped[int] = mapped_column(String, nullable=False) #change to integer
+    home_address_id: Mapped[int] = mapped_column(String) #change to integer
+    major: Mapped[str] = mapped_column(String)
+
+class Sellers(Base):
+    __tablename__ = "sellers"
+
+    email: Mapped[str] = mapped_column(String, ForeignKey("users.email"), primary_key=True)
+    bank_routing_number: Mapped[str] = mapped_column(String, nullable=False)
+    bank_account_number: Mapped[str] = mapped_column(String, nullable=False)
+    balance: Mapped[float] = mapped_column(String, nullable=False) #make this a float
+
+class Helpdesk(Base):
+    __tablename__ = "helpdesk"
+
+    email: Mapped[str] = mapped_column(String, ForeignKey("users.email"), primary_key=True)
+    Position: Mapped[str] = mapped_column(String, nullable=False)
+
+
 engine = create_engine("sqlite:///redball.db", echo=True)
 Base.metadata.create_all(engine)
 
@@ -52,4 +91,16 @@ users_size = len(users_data['email']) #the amount of entries in users
 for i in range(users_size):
     users_data['password'][i] = hashlib.sha256(users_data['password'][i].encode()).hexdigest()
 
+bidders_data = parse("testdb/Bidders.csv") #parses bidders.csv
+bidders_size = len(bidders_data['email']) #the amount of entries in bidders
+
+sellers_data = parse("testdb/Sellers.csv")
+sellers_size = len(sellers_data['email'])
+
+helpdesk_data = parse("testdb/Helpdesk.csv")
+helpdesk_size = len(helpdesk_data['email'])
+
 seed(Users, users_data, users_size, engine)
+seed(Bidders, bidders_data, bidders_size, engine)
+seed(Sellers, sellers_data, sellers_size, engine)
+seed(Helpdesk, helpdesk_data, helpdesk_size, engine)
