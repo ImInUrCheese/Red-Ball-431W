@@ -40,7 +40,7 @@
 	// Configure tool-specific properties.
 	"customizations": {
 		"vscode": {
-			"extensions": ["anthropic.claude-code", "qwtel.sqlite-viewer", "cweijan.vscode-mysql-client2"]
+			"extensions": ["qwtel.sqlite-viewer", "cweijan.vscode-mysql-client2"]
 		}
 	}
 
