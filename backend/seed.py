@@ -1,106 +1,96 @@
 import csv
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
-from sqlalchemy import String, Integer, ForeignKey, create_engine
+from sqlalchemy import String, Integer, ForeignKey, Float
 import hashlib
+from database import db
 
-def parse(file_path, type_map):
+def parse(file_path, type_map={}):
+    if type_map is None:
+        type_map = {}
     columns = {}
-
     with open(file_path, mode="r", newline="", encoding="utf-8-sig") as file:
         data = csv.DictReader(file)
-
         for field in data.fieldnames:
             columns[field] = []
-
         for row in data:
             for field in data.fieldnames:
                 raw = row[field].strip()
-
                 if raw == "":
                     value = None
                 else:
                     converter = type_map.get(field, str)
-
                     if converter == int:
                         value = int(raw)
                     elif converter == float:
                         value = float(raw)
                     else:
-                        value = raw  # string
-
+                        value = raw
                 columns[field].append(value)
-
     return columns
 
-def seed(table, data, size, engine):
-    with Session(engine) as session:
-        for i in range(size):
-            row = {}
-
-            for col in data:
-                value = data[col][i]
+def seed(table, data, size):
+    for i in range(size):
+        row = {}
+        for col in data:
+            value = data[col][i]
+            if isinstance(value, str):
                 value = value.strip()
-                row[col] = value
+            row[col] = value
+        new_entry = table(**row)
+        db.session.add(new_entry)
+    db.session.commit()
 
-            new_entry = table(**row)
-            session.add(new_entry)
-
-        session.commit()
-
-class Base(DeclarativeBase):
-    pass
-
-class Users(Base):
+class Users(db.Model):
     __tablename__ = "users"
+    email = db.Column(String(255), primary_key=True)
+    password = db.Column(String(255), nullable=False)
 
-    email: Mapped[str] = mapped_column(String, primary_key=True)
-    password: Mapped[str] = mapped_column(String, nullable=False)
-
-class Bidders(Base):
+class Bidders(db.Model):
     __tablename__ = "bidders"
+    email = db.Column(String(255), ForeignKey("users.email"), primary_key=True)
+    first_name = db.Column(String(100), nullable=False)
+    last_name = db.Column(String(100), nullable=False)
+    age = db.Column(Integer, nullable=False)
+    home_address_id = db.Column(String(32))
+    major = db.Column(String(100))
 
-    email: Mapped[str] = mapped_column(String, ForeignKey("users.email"), primary_key=True)
-    first_name: Mapped[str] = mapped_column(String, nullable=False)
-    last_name: Mapped[str] = mapped_column(String, nullable=False)
-    age: Mapped[int] = mapped_column(String, nullable=False) #change to integer
-    home_address_id: Mapped[int] = mapped_column(String) #change to integer
-    major: Mapped[str] = mapped_column(String)
-
-class Sellers(Base):
+class Sellers(db.Model):
     __tablename__ = "sellers"
+    email = db.Column(String(255), ForeignKey("users.email"), primary_key=True)
+    bank_routing_number = db.Column(String(50), nullable=False)
+    bank_account_number = db.Column(String(50), nullable=False)
+    balance = db.Column(Float, nullable=False)
 
-    email: Mapped[str] = mapped_column(String, ForeignKey("users.email"), primary_key=True)
-    bank_routing_number: Mapped[str] = mapped_column(String, nullable=False)
-    bank_account_number: Mapped[str] = mapped_column(String, nullable=False)
-    balance: Mapped[float] = mapped_column(String, nullable=False) #make this a float
-
-class Helpdesk(Base):
+class Helpdesk(db.Model):
     __tablename__ = "helpdesk"
+    email = db.Column(String(255), ForeignKey("users.email"), primary_key=True)
+    Position = db.Column(String(100), nullable=False)
 
-    email: Mapped[str] = mapped_column(String, ForeignKey("users.email"), primary_key=True)
-    Position: Mapped[str] = mapped_column(String, nullable=False)
+def init_db():
+    db.create_all()
+    
+    db.session.execute(db.text("SET FOREIGN_KEY_CHECKS=0"))
+    
+    if Users.query.first() is None:
+        users_data = parse("testdb/Users.csv")
+        users_size = len(users_data['email'])
+        for i in range(users_size):
+            users_data['password'][i] = hashlib.sha256(users_data['password'][i].encode()).hexdigest()
+        seed(Users, users_data, users_size)
 
+    if Bidders.query.first() is None:
+        bidders_data = parse("testdb/Bidders.csv", type_map={"age": int})
+        bidders_size = len(bidders_data['email'])
+        seed(Bidders, bidders_data, bidders_size)
 
-engine = create_engine("sqlite:///redball.db", echo=True)
-Base.metadata.create_all(engine)
+    if Sellers.query.first() is None:
+        sellers_data = parse("testdb/Sellers.csv")
+        sellers_size = len(sellers_data['email'])
+        seed(Sellers, sellers_data, sellers_size)
 
-users_data = parse("testdb/Users.csv") #parses users.csv
-users_size = len(users_data['email']) #the amount of entries in users
+    if Helpdesk.query.first() is None:
+        helpdesk_data = parse("testdb/Helpdesk.csv")
+        helpdesk_size = len(helpdesk_data['email'])
+        seed(Helpdesk, helpdesk_data, helpdesk_size)
 
-#hashes the passwords
-for i in range(users_size):
-    users_data['password'][i] = hashlib.sha256(users_data['password'][i].encode()).hexdigest()
-
-bidders_data = parse("testdb/Bidders.csv") #parses bidders.csv
-bidders_size = len(bidders_data['email']) #the amount of entries in bidders
-
-sellers_data = parse("testdb/Sellers.csv")
-sellers_size = len(sellers_data['email'])
-
-helpdesk_data = parse("testdb/Helpdesk.csv")
-helpdesk_size = len(helpdesk_data['email'])
-
-seed(Users, users_data, users_size, engine)
-seed(Bidders, bidders_data, bidders_size, engine)
-seed(Sellers, sellers_data, sellers_size, engine)
-seed(Helpdesk, helpdesk_data, helpdesk_size, engine)
+    db.session.execute(db.text("SET FOREIGN_KEY_CHECKS=1"))
+    db.session.commit()
