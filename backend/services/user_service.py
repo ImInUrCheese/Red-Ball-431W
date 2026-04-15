@@ -1,37 +1,154 @@
-from flask import current_app
-from sqlalchemy import text
-from model.users import User
+import hashlib
+from database import db
+from model.users import Users, Bidders, Sellers, Helpdesk
+from model.address import Address
 
 
 def authenticate(email: str, password_hash: str) -> dict:
-    session = current_app.session_factory()
-    try:
-        user = session.get(User, email)
-        if user and user.password == password_hash:
-            role = _get_role(session, email)
-            return {'success': True, 'role': role}
-        return {'success': False, 'error': 'Invalid email or password'}
-    finally:
-        session.close()
+    user = db.session.get(Users, email)
+    if user and user.password == password_hash:
+        role = _get_role(email)
+        return {'success': True, 'role': role}
+    return {'success': False, 'error': 'Invalid email or password'}
 
 
-def _get_role(session, email: str) -> str:
-    row = session.execute(
-        text("SELECT email FROM bidders WHERE email = :e"), {'e': email}
-    ).fetchone()
-    if row:
+def _get_role(email: str) -> str:
+    if db.session.get(Bidders, email):
         return 'bidder'
-
-    row = session.execute(
-        text("SELECT email FROM sellers WHERE email = :e"), {'e': email}
-    ).fetchone()
-    if row:
+    if db.session.get(Sellers, email):
         return 'seller'
-
-    row = session.execute(
-        text("SELECT email FROM helpdesk WHERE email = :e"), {'e': email}
-    ).fetchone()
-    if row:
+    if db.session.get(Helpdesk, email):
         return 'helpdesk'
-
     return 'unknown'
+
+
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
+
+def register_bidder(email: str, password_hash: str, first_name: str,
+                    last_name: str, age: int, major: str = None,
+                    home_address_id: str = None) -> dict:
+    if db.session.get(Users, email):
+        return {'success': False, 'error': 'Email already registered'}
+    db.session.add(Users(email=email, password=password_hash))
+    db.session.add(Bidders(
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        age=age,
+        major=major,
+        home_address_id=home_address_id,
+    ))
+    db.session.commit()
+    return {'success': True}
+
+
+def register_seller(email: str, password_hash: str, bank_routing_number: str,
+                    bank_account_number: str) -> dict:
+    if db.session.get(Users, email):
+        return {'success': False, 'error': 'Email already registered'}
+    db.session.add(Users(email=email, password=password_hash))
+    db.session.add(Sellers(
+        email=email,
+        bank_routing_number=bank_routing_number,
+        bank_account_number=bank_account_number,
+        balance=0.0,
+    ))
+    db.session.commit()
+    return {'success': True}
+
+
+def register_helpdesk(email: str, password_hash: str, position: str) -> dict:
+    if db.session.get(Users, email):
+        return {'success': False, 'error': 'Email already registered'}
+    db.session.add(Users(email=email, password=password_hash))
+    db.session.add(Helpdesk(email=email, position=position))
+    db.session.commit()
+    return {'success': True}
+
+
+# ---------------------------------------------------------------------------
+# Profile reads
+# ---------------------------------------------------------------------------
+
+def get_bidder_profile(email: str) -> dict | None:
+    bidder = db.session.get(Bidders, email)
+    if not bidder:
+        return None
+    return {
+        'email': bidder.email,
+        'first_name': bidder.first_name,
+        'last_name': bidder.last_name,
+        'age': bidder.age,
+        'major': bidder.major,
+        'home_address_id': bidder.home_address_id,
+    }
+
+
+def get_seller_profile(email: str) -> dict | None:
+    seller = db.session.get(Sellers, email)
+    if not seller:
+        return None
+    return {
+        'email': seller.email,
+        'bank_routing_number': seller.bank_routing_number,
+        'bank_account_number': seller.bank_account_number,
+        'balance': seller.balance,
+    }
+
+
+def get_helpdesk_profile(email: str) -> dict | None:
+    staff = db.session.get(Helpdesk, email)
+    if not staff:
+        return None
+    return {
+        'email': staff.email,
+        'position': staff.position,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Profile updates
+# ---------------------------------------------------------------------------
+
+def update_bidder_profile(email: str, first_name: str = None, last_name: str = None,
+                          age: int = None, major: str = None,
+                          home_address_id: str = None) -> dict:
+    bidder = db.session.get(Bidders, email)
+    if not bidder:
+        return {'success': False, 'error': 'Bidder not found'}
+    if first_name is not None:
+        bidder.first_name = first_name
+    if last_name is not None:
+        bidder.last_name = last_name
+    if age is not None:
+        bidder.age = age
+    if major is not None:
+        bidder.major = major
+    if home_address_id is not None:
+        bidder.home_address_id = home_address_id
+    db.session.commit()
+    return {'success': True}
+
+
+def update_seller_profile(email: str, bank_routing_number: str = None,
+                          bank_account_number: str = None) -> dict:
+    seller = db.session.get(Sellers, email)
+    if not seller:
+        return {'success': False, 'error': 'Seller not found'}
+    if bank_routing_number is not None:
+        seller.bank_routing_number = bank_routing_number
+    if bank_account_number is not None:
+        seller.bank_account_number = bank_account_number
+    db.session.commit()
+    return {'success': True}
+
+
+def update_password(email: str, new_password_hash: str) -> dict:
+    user = db.session.get(Users, email)
+    if not user:
+        return {'success': False, 'error': 'User not found'}
+    user.password = new_password_hash
+    db.session.commit()
+    return {'success': True}
