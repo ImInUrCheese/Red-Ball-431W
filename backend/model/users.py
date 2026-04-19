@@ -6,6 +6,7 @@ class Users(db.Model):
     __tablename__ = "users"
     email = db.Column(String(255), primary_key=True)
     password = db.Column(String(255), nullable=False)
+    image_filename = db.Column(String(255), nullable=True)
 
 
 class Bidders(db.Model):

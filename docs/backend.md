@@ -27,8 +27,9 @@ All models are re-exported from `model/__init__.py` so that importing from `mode
 |---|---|---|
 | `email` | String(255) | Primary Key |
 | `password` | String(255) | NOT NULL — stored as SHA-256 hash |
+| `image_filename` | String(255) | nullable — UUID-based filename saved in `static/images/` |
 
-Base table for all user types. Every bidder, seller, and helpdesk member has a row here.
+Base table for all user types. Every bidder, seller, and helpdesk member has a row here. `image_filename` is shared across all roles since every user can have a profile image. When `NULL`, the system serves `DefaultUserImage.jpg`.
 
 ---
 
@@ -172,6 +173,7 @@ Self-referential hierarchy. The root node is `'All'` with `parent_category = NUL
 | `reserve_price` | Float | NOT NULL |
 | `max_bids` | Integer | NOT NULL — auction ends when bid count reaches this |
 | `status` | Integer | NOT NULL, default `1` — `1`: active, `0`: inactive, `2`: sold |
+| `image_filename` | String(255) | nullable — UUID-based filename saved in `static/images/` |
 
 `listing_id` is unique per seller, not globally. The composite `(seller_email, listing_id)` is the global identifier used as a FK in `Bids`, `Transactions`, and `ListingRemovals`.
 

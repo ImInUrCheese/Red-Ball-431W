@@ -1,5 +1,6 @@
 from database import db
 from model.listings import Categories, AuctionListings, ListingRemovals, Bids
+from services.image_service import save_image, get_image_url
 from sqlalchemy import or_
 
 
@@ -62,7 +63,6 @@ def get_seller_listings(seller_email: str) -> dict:
 def create_listing(seller_email: str, category: str, auction_title: str,
                    product_name: str, product_description: str,
                    quantity: int, reserve_price: float, max_bids: int) -> dict:
-    # Assign next listing_id for this seller
     last = (AuctionListings.query
             .filter_by(seller_email=seller_email)
             .order_by(AuctionListings.listing_id.desc())
@@ -133,6 +133,31 @@ def deactivate_listing(seller_email: str, listing_id: int,
 
 
 # ---------------------------------------------------------------------------
+# Image upload
+# ---------------------------------------------------------------------------
+
+def upload_listing_image(seller_email: str, listing_id: int, file) -> dict:
+    """Save an uploaded listing image and store its filename on the AuctionListings row.
+
+    Accepts .jpg, .jpeg, .png. Falls back to DefaultUserImage.jpg when no
+    image has been set.
+
+    Returns:
+        {'success': True, 'image_url': '/static/images/<filename>'}
+        {'success': False, 'error': '<reason>'}
+    """
+    listing = db.session.get(AuctionListings, (seller_email, listing_id))
+    if not listing:
+        return {'success': False, 'error': 'Listing not found'}
+    result = save_image(file)
+    if not result['success']:
+        return result
+    listing.image_filename = result['filename']
+    db.session.commit()
+    return {'success': True, 'image_url': get_image_url(listing.image_filename)}
+
+
+# ---------------------------------------------------------------------------
 # Search
 # ---------------------------------------------------------------------------
 
@@ -175,4 +200,5 @@ def _serialize_listing(l: AuctionListings) -> dict:
         'reserve_price': l.reserve_price,
         'max_bids': l.max_bids,
         'status': l.status,
+        'image_url': get_image_url(l.image_filename),
     }
