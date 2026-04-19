@@ -20,6 +20,7 @@ class AuctionListings(db.Model):
     reserve_price = db.Column(Float, nullable=False)
     max_bids = db.Column(Integer, nullable=False)
     status = db.Column(Integer, nullable=False, default=1)  # 1: active, 0: inactive, 2: sold
+    image_filename = db.Column(String(255), nullable=True)
 
 
 class ListingRemovals(db.Model):

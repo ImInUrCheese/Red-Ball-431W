@@ -1,7 +1,6 @@
-import hashlib
 from database import db
 from model.users import Users, Bidders, Sellers, Helpdesk
-from model.address import Address
+from services.image_service import save_image, get_image_url
 
 
 def authenticate(email: str, password_hash: str) -> dict:
@@ -76,6 +75,7 @@ def get_bidder_profile(email: str) -> dict | None:
     bidder = db.session.get(Bidders, email)
     if not bidder:
         return None
+    user = db.session.get(Users, email)
     return {
         'email': bidder.email,
         'first_name': bidder.first_name,
@@ -83,6 +83,7 @@ def get_bidder_profile(email: str) -> dict | None:
         'age': bidder.age,
         'major': bidder.major,
         'home_address_id': bidder.home_address_id,
+        'image_url': get_image_url(user.image_filename),
     }
 
 
@@ -90,11 +91,13 @@ def get_seller_profile(email: str) -> dict | None:
     seller = db.session.get(Sellers, email)
     if not seller:
         return None
+    user = db.session.get(Users, email)
     return {
         'email': seller.email,
         'bank_routing_number': seller.bank_routing_number,
         'bank_account_number': seller.bank_account_number,
         'balance': seller.balance,
+        'image_url': get_image_url(user.image_filename),
     }
 
 
@@ -102,9 +105,11 @@ def get_helpdesk_profile(email: str) -> dict | None:
     staff = db.session.get(Helpdesk, email)
     if not staff:
         return None
+    user = db.session.get(Users, email)
     return {
         'email': staff.email,
         'position': staff.position,
+        'image_url': get_image_url(user.image_filename),
     }
 
 
@@ -152,3 +157,28 @@ def update_password(email: str, new_password_hash: str) -> dict:
     user.password = new_password_hash
     db.session.commit()
     return {'success': True}
+
+
+# ---------------------------------------------------------------------------
+# Image upload
+# ---------------------------------------------------------------------------
+
+def upload_user_image(email: str, file) -> dict:
+    """Save an uploaded profile image and store its filename on the Users row.
+
+    Accepts .jpg, .jpeg, .png. Falls back to DefaultUserImage.jpg when no
+    image has been set.
+
+    Returns:
+        {'success': True, 'image_url': '/static/images/<filename>'}
+        {'success': False, 'error': '<reason>'}
+    """
+    user = db.session.get(Users, email)
+    if not user:
+        return {'success': False, 'error': 'User not found'}
+    result = save_image(file)
+    if not result['success']:
+        return result
+    user.image_filename = result['filename']
+    db.session.commit()
+    return {'success': True, 'image_url': get_image_url(user.image_filename)}

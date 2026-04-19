@@ -7,15 +7,34 @@ All service files live under `backend/services/`. Services are the only layer th
 ## Service Dependencies
 
 ```
+image_service          (no dependencies)
 notification_service   (no dependencies)
-       ↑
+       ↑                      ↑
 bid_service            → notification_service
 transaction_service    → notification_service
-user_service           (no dependencies)
-listing_service        (no dependencies)
+user_service           → image_service
+listing_service        → image_service
 helpdesk_service       (no dependencies)
 rating_service         (no dependencies)
 ```
+
+---
+
+## image_service.py
+
+Handles image file validation, saving, and URL resolution. Does not touch the database — it only manages files on disk. Called by `user_service` and `listing_service`.
+
+**Accepted formats:** `.jpg`, `.jpeg`, `.png`
+
+**Storage location:** `backend/static/images/` — served by Flask at `/static/images/<filename>`
+
+**Default image:** `backend/model/DefaultUserImage.jpg` is copied into `static/images/` on startup by `ensure_default_image()` (called from `app.py`). All `image_filename = NULL` cases resolve to this file.
+
+| Function | Parameters | Returns | Description |
+|---|---|---|---|
+| `ensure_default_image` | — | `None` | Copies `DefaultUserImage.jpg` from `model/` to `static/images/` if not already present. Called once at app startup |
+| `get_image_url` | `filename: str \| None` | `str` | Returns `/static/images/<filename>`, or `/static/images/DefaultUserImage.jpg` when `filename` is `None` |
+| `save_image` | `file` | `dict` | Validates extension, generates a UUID-based filename, saves to `static/images/`. Returns `{success, filename}` or `{success, error}` |
 
 ---
 
@@ -68,6 +87,9 @@ All registration functions reject duplicate emails.
 | `update_bidder_profile` | `email`, `first_name?`, `last_name?`, `age?`, `major?`, `home_address_id?` | `dict` | Updates only the fields provided. Email cannot be changed |
 | `update_seller_profile` | `email`, `bank_routing_number?`, `bank_account_number?` | `dict` | Updates only the fields provided |
 | `update_password` | `email`, `new_password_hash` | `dict` | Replaces the stored password hash |
+| `upload_user_image` | `email`, `file` | `dict` | Validates and saves a profile image (`.jpg`, `.jpeg`, `.png`), stores the filename on the `Users` row. Returns `{success, image_url}` or `{success, error}`. Falls back to `DefaultUserImage.jpg` when no image is set |
+
+All profile read functions (`get_bidder_profile`, `get_seller_profile`, `get_helpdesk_profile`) include an `image_url` field in their returned dict, resolved via `image_service.get_image_url`.
 
 ---
 
@@ -97,7 +119,11 @@ Handles category browsing, auction listing CRUD, and product search.
 | `update_listing` | `seller_email`, `listing_id`, `**fields` | `dict` | Updates allowed fields. Blocked if listing is sold or if active with existing bids |
 | `deactivate_listing` | `seller_email`, `listing_id`, `removal_reason` | `dict` | Sets status to `0` and writes a `ListingRemovals` audit record |
 
+| `upload_listing_image` | `seller_email`, `listing_id`, `file` | `dict` | Validates and saves a listing image (`.jpg`, `.jpeg`, `.png`), stores the filename on the `AuctionListings` row. Returns `{success, image_url}` or `{success, error}`. Falls back to `DefaultUserImage.jpg` when no image is set |
+
 **`update_listing` allowed fields:** `category`, `auction_title`, `product_name`, `product_description`, `quantity`, `reserve_price`, `max_bids`
+
+All listing serializers (`get_listing_detail`, `get_listings_by_category`, `get_seller_listings`, `search_listings`) include an `image_url` field in every listing dict, resolved via `image_service.get_image_url`.
 
 ### Search
 
