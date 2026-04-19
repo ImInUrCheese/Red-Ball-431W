@@ -49,8 +49,26 @@ def seed(table, data, size):
     db.session.commit()
 
 
+def _add_column_if_missing(table: str, column: str, definition: str):
+    """Add a column to an existing table if it does not already exist.
+    Uses INFORMATION_SCHEMA so it is safe to call on every startup.
+    """
+    exists = db.session.execute(db.text(
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() "
+        "AND TABLE_NAME = :table AND COLUMN_NAME = :column"
+    ), {'table': table, 'column': column}).scalar()
+    if not exists:
+        db.session.execute(db.text(
+            f"ALTER TABLE `{table}` ADD COLUMN `{column}` {definition}"
+        ))
+        db.session.commit()
+
+
 def init_db():
     db.create_all()
+    _add_column_if_missing('users', 'image_filename', 'VARCHAR(255) NULL')
+    _add_column_if_missing('auction_listings', 'image_filename', 'VARCHAR(255) NULL')
     db.session.execute(db.text("SET FOREIGN_KEY_CHECKS=0"))
 
     if ZipcodeInfo.query.first() is None:
