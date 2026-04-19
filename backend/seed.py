@@ -28,11 +28,11 @@ def parse(file_path, type_map={}):
                 else:
                     converter = type_map.get(field, str)
                     if converter == int:
-                        value = int(raw)
+                        value = int(raw.replace(',', ''))
                     elif converter == float:
-                        value = float(raw)
+                        value = float(raw.replace(',', ''))
                     elif converter == 'price':
-                        value = float(raw.replace('$', '').strip())
+                        value = float(raw.replace('$', '').replace(',', '').strip())
                     elif converter == 'date':
                         value = datetime.strptime(raw, '%m/%d/%y').date()
                     else:
@@ -113,7 +113,7 @@ def init_db():
                     type_map={"expire_month": int, "expire_year": int})
         d = {
             'credit_card_num': raw['credit_card_num'],
-            'card_type': raw['card type'],
+            'card_type': raw['card_type'],
             'expire_month': raw['expire_month'],
             'expire_year': raw['expire_year'],
             'security_code': raw['security_code'],
