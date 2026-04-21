@@ -31,5 +31,5 @@ export function searchListings(keyword?: string, minPrice?: number, maxPrice?: n
 }
 
 export function getTopLevelCategories(): Promise<string[]> {
-  return request<string[]>('/categories/Root')
+  return request<string[]>('/categories/All')
 }
