@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { CSSProperties, FormEvent } from 'react'
+import type { CSSProperties } from 'react'
 
 type AccountForm = {
   firstName: string
@@ -26,17 +26,17 @@ type AccountForm = {
 
 type SettingsTab = 'profile' | 'payment' | 'password' | 'sellerInfo'
 
-const tabs: { id: SettingsTab; icon: string; label: string }[] = [
-  { id: 'profile', icon: 'P', label: 'Profile' },
-  { id: 'payment', icon: '$', label: 'Payment' },
-  { id: 'password', icon: '*', label: 'Password' },
-  { id: 'sellerInfo', icon: 'S', label: 'Seller Info' },
+const allTabs: { id: SettingsTab; icon: string; label: string; roles: string[] }[] = [
+  { id: 'profile',    icon: 'P', label: 'Profile',     roles: ['bidder', 'seller', 'helpdesk'] },
+  { id: 'payment',   icon: '$', label: 'Payment',     roles: ['bidder'] },
+  { id: 'password',  icon: '*', label: 'Password',    roles: ['bidder', 'seller', 'helpdesk'] },
+  { id: 'sellerInfo', icon: 'S', label: 'Seller Info', roles: ['seller'] },
 ]
 
 const initialForm: AccountForm = {
-  firstName: 'Alex',
-  lastName: 'Smith',
-  email: 'alex.smith@lsu.edu',
+  firstName: '',
+  lastName: '',
+  email: '',
   phone: '(814) 555-0192',
   streetNumber: '173',
   streetName: 'College Ave',
@@ -56,10 +56,17 @@ const initialForm: AccountForm = {
   confirmPassword: '',
 }
 
-export default function AccountSettingsPage() {
+interface AccountSettingsProps {
+  userName: string
+  role: 'bidder' | 'seller' | 'helpdesk'
+  onBack: () => void
+}
+
+export default function AccountSettingsPage({ userName, role, onBack }: AccountSettingsProps) {
+  const tabs = allTabs.filter(t => t.roles.includes(role))
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   const [status, setStatus] = useState('')
-  const [form, setForm] = useState<AccountForm>(initialForm)
+  const [form, setForm] = useState<AccountForm>(() => ({ ...initialForm, email: userName }))
 
   const fullName = `${form.firstName} ${form.lastName}`.trim()
   const initials = useMemo(
@@ -113,7 +120,7 @@ export default function AccountSettingsPage() {
     return ''
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: React.SyntheticEvent) {
     event.preventDefault()
     const error = validateActiveTab()
 
@@ -129,11 +136,12 @@ export default function AccountSettingsPage() {
     <div style={styles.page}>
       <main style={styles.main}>
         <header style={styles.profileHeader}>
-          <div style={styles.avatar}>{initials}</div>
+          <button type="button" style={styles.backButton} onClick={onBack}>← Back</button>
+          <div style={styles.avatar}>{initials || form.email[0]?.toUpperCase() || 'U'}</div>
           <div style={styles.profileTitleBlock}>
             <p style={styles.eyebrow}>Account Settings</p>
-            <h1 style={styles.name}>{fullName || 'Your Account'}</h1>
-            <p style={styles.emailLine}>{form.email} - Bidder and Seller</p>
+            <h1 style={styles.name}>{fullName || form.email}</h1>
+            <p style={styles.emailLine}>{form.email} · {role}</p>
           </div>
         </header>
 
@@ -439,6 +447,16 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '16px',
     marginBottom: '22px',
+  },
+  backButton: {
+    padding: '6px 12px',
+    background: 'transparent',
+    color: '#7dbde8',
+    border: '1px solid #36516d',
+    borderRadius: '6px',
+    font: '700 13px Inter, "Segoe UI", system-ui, sans-serif',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
   },
   avatar: {
     width: '64px',

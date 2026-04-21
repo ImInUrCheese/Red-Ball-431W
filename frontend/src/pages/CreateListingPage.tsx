@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties, DragEvent, FormEvent } from 'react'
+import type { ChangeEvent, CSSProperties, DragEvent } from 'react'
 
 type ListingForm = {
   auctionTitle: string
@@ -42,7 +42,12 @@ const initialForm: ListingForm = {
   photoName: '',
 }
 
-export default function CreateListingPage() {
+interface CreateListingProps {
+  userName: string
+  onBack: () => void
+}
+
+export default function CreateListingPage({ onBack }: CreateListingProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [photoError, setPhotoError] = useState('')
@@ -132,7 +137,7 @@ export default function CreateListingPage() {
     handlePhotoSelect(event.dataTransfer.files[0])
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: React.SyntheticEvent) {
     event.preventDefault()
 
     if (currentStep !== 3) {
@@ -147,6 +152,7 @@ export default function CreateListingPage() {
     <div style={styles.page}>
       <main style={styles.main}>
         <section style={styles.header}>
+          <button type="button" style={styles.backButton} onClick={onBack}>← Back</button>
           <p style={styles.eyebrow}>Seller Workspace</p>
           <h1 style={styles.title}>Create Listing</h1>
           <p style={styles.subtitle}>
@@ -376,6 +382,16 @@ const styles: Record<string, CSSProperties> = {
   },
   header: {
     marginBottom: '24px',
+  },
+  backButton: {
+    marginBottom: '16px',
+    padding: '6px 12px',
+    background: 'transparent',
+    color: '#7dbde8',
+    border: '1px solid #36516d',
+    borderRadius: '6px',
+    font: '700 13px Inter, "Segoe UI", system-ui, sans-serif',
+    cursor: 'pointer',
   },
   eyebrow: {
     margin: '0 0 8px',

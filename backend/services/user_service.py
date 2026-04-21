@@ -12,12 +12,12 @@ def authenticate(email: str, password_hash: str) -> dict:
 
 
 def _get_role(email: str) -> str:
-    if db.session.get(Bidders, email):
-        return 'bidder'
-    if db.session.get(Sellers, email):
-        return 'seller'
     if db.session.get(Helpdesk, email):
         return 'helpdesk'
+    if db.session.get(Sellers, email):
+        return 'seller'
+    if db.session.get(Bidders, email):
+        return 'bidder'
     return 'unknown'
 
 

@@ -6,7 +6,7 @@ import './LoginPage.css'
 type Tab = 'signin' | 'register'
 type Toast = { message: string; success: boolean } | null
 
-export default function LoginPage({ onLogin }: { onLogin: (role: UserRole) => void }) {
+export default function LoginPage({ onLogin }: { onLogin: (role: UserRole, email: string) => void }) {
   const [tab, setTab] = useState<Tab>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,7 +24,7 @@ export default function LoginPage({ onLogin }: { onLogin: (role: UserRole) => vo
     }
     const data = await login(email, password)
     if (data.success && data.role) {
-      onLogin(data.role)
+      onLogin(data.role, email.trim().toLowerCase())
     } else {
       showToast(data.error || 'Invalid email or password.', false)
     }

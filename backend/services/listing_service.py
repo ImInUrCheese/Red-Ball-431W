@@ -1,5 +1,5 @@
 from database import db
-from model.listings import Categories, AuctionListings, ListingRemovals, Bids
+from model.listings import Categories, AuctionListings, ListingRemovals, Bids, Transactions
 from services.image_service import save_image, get_image_url
 from sqlalchemy import or_
 
@@ -155,6 +155,58 @@ def upload_listing_image(seller_email: str, listing_id: int, file) -> dict:
     listing.image_filename = result['filename']
     db.session.commit()
     return {'success': True, 'image_url': get_image_url(listing.image_filename)}
+
+
+def get_seller_active_listings(seller_email: str) -> list:
+    listings = (AuctionListings.query
+                .filter_by(seller_email=seller_email, status=1)
+                .all())
+    result = []
+    for l in listings:
+        bids = (Bids.query
+                .filter_by(seller_email=seller_email, listing_id=l.listing_id)
+                .order_by(Bids.bid_price.desc())
+                .all())
+        bid_count = len(bids)
+        highest_bid = bids[0].bid_price if bids else None
+        result.append({
+            **_serialize_listing(l),
+            'highest_bid': highest_bid,
+            'bid_count': bid_count,
+            'bids_remaining': l.max_bids - bid_count,
+        })
+    return result
+
+
+def get_seller_sales_history(seller_email: str) -> list:
+    listings = (AuctionListings.query
+                .filter_by(seller_email=seller_email)
+                .filter(AuctionListings.status.in_([0, 2]))
+                .all())
+    result = []
+    for l in listings:
+        if l.status == 2:
+            transaction = (Transactions.query
+                           .filter_by(seller_email=seller_email, listing_id=l.listing_id)
+                           .first())
+            result.append({
+                'listing_id': l.listing_id,
+                'auction_title': l.auction_title,
+                'category': l.category,
+                'final_payment': transaction.payment if transaction else None,
+                'date': transaction.date.isoformat() if transaction else None,
+                'status': 'sold',
+            })
+        else:
+            result.append({
+                'listing_id': l.listing_id,
+                'auction_title': l.auction_title,
+                'category': l.category,
+                'final_payment': None,
+                'date': None,
+                'status': 'unsold',
+            })
+    return result
 
 
 # ---------------------------------------------------------------------------
