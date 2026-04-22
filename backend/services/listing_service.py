@@ -3,10 +3,7 @@ from model.listings import Categories, AuctionListings, ListingRemovals, Bids, T
 from services.image_service import save_image, get_image_url
 from sqlalchemy import or_
 
-
-# ---------------------------------------------------------------------------
 # Category hierarchy
-# ---------------------------------------------------------------------------
 
 def get_subcategories(parent_category: str) -> list:
     # 'Root' is an internal seeder node; treat 'All' and 'Root' as equivalent
@@ -45,9 +42,7 @@ def get_listings_by_category(category_name: str) -> list:
     return result
 
 
-# ---------------------------------------------------------------------------
 # Listing detail
-# ---------------------------------------------------------------------------
 
 def get_listing_detail(seller_email: str, listing_id: int) -> dict | None:
     listing = db.session.get(AuctionListings, (seller_email, listing_id))
@@ -67,9 +62,7 @@ def get_listing_detail(seller_email: str, listing_id: int) -> dict | None:
     }
 
 
-# ---------------------------------------------------------------------------
 # Seller listing management
-# ---------------------------------------------------------------------------
 
 def get_seller_listings(seller_email: str) -> dict:
     listings = AuctionListings.query.filter_by(seller_email=seller_email).all()
@@ -153,10 +146,7 @@ def deactivate_listing(seller_email: str, listing_id: int,
     db.session.commit()
     return {'success': True}
 
-
-# ---------------------------------------------------------------------------
 # Image upload
-# ---------------------------------------------------------------------------
 
 def upload_listing_image(seller_email: str, listing_id: int, file) -> dict:
     """Save an uploaded listing image and store its filename on the AuctionListings row.
@@ -230,10 +220,7 @@ def get_seller_sales_history(seller_email: str) -> list:
             })
     return result
 
-
-# ---------------------------------------------------------------------------
 # Search
-# ---------------------------------------------------------------------------
 
 def search_listings(keyword: str = None, min_price: float = None,
                     max_price: float = None) -> list:
@@ -268,10 +255,7 @@ def search_listings(keyword: str = None, min_price: float = None,
         result.append(s)
     return result
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# Serializer
 
 def _serialize_listing(l: AuctionListings) -> dict:
     return {

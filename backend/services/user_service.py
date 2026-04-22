@@ -22,10 +22,7 @@ def get_roles(email: str) -> list:
         roles.append('bidder')
     return roles
 
-
-# ---------------------------------------------------------------------------
 # Registration
-# ---------------------------------------------------------------------------
 
 def register_bidder(email: str, password_hash: str, first_name: str,
                     last_name: str, age: int, major: str = None,
@@ -87,9 +84,7 @@ def register_helpdesk(email: str, password_hash: str, position: str) -> dict:
         return {'success': False, 'error': str(e)}
 
 
-# ---------------------------------------------------------------------------
 # Profile reads
-# ---------------------------------------------------------------------------
 
 def get_bidder_profile(email: str) -> dict | None:
     bidder = db.session.get(Bidders, email)
@@ -144,10 +139,7 @@ def get_payment_info(email: str) -> dict | None:
         'expire_year':   card.expire_year,
     }
 
-
-# ---------------------------------------------------------------------------
 # Profile updates
-# ---------------------------------------------------------------------------
 
 def update_bidder_profile(email: str, first_name: str = None, last_name: str = None,
                           age: int = None, major: str = None,

@@ -148,10 +148,7 @@ def check_auction_complete(seller_email: str, listing_id: int) -> dict:
         'highest_bid': bids[0].bid_price if bids else None,
     }
 
-
-# ---------------------------------------------------------------------------
-# Internal — called when max_bids is reached after a bid is placed
-# ---------------------------------------------------------------------------
+# Internal called when max_bids is reached after a bid is placed
 
 def _close_auction(listing: AuctionListings, all_bids: list):
     all_bids_sorted = sorted(all_bids, key=lambda b: b.bid_price, reverse=True)
