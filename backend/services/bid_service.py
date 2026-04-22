@@ -5,7 +5,7 @@ from services.notification_service import create_notification
 
 def place_bid(bidder_email: str, seller_email: str,
               listing_id: int, bid_price: float) -> dict:
-    listing = db.session.get(AuctionListings, (seller_email, listing_id))7
+    listing = db.session.get(AuctionListings, (seller_email, listing_id))
     if not listing:
         return {'success': False, 'error': 'Listing not found'}
     if listing.status != 1:
