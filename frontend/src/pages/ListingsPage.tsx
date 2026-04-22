@@ -1,24 +1,44 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import SearchBar from '../components/SearchBar'
-
+//raw data coming from backend
 type ApiListing = {
+  [key: string]: unknown
   id?: number
+  listingId?: number
   listing_id?: number
   title?: string
   auction_title?: string
+  auctionTitle?: string
+  product_name?: string
+  productName?: string
   category?: string
   seller_email?: string
+  sellerEmail?: string
   seller?: string
   price?: number
   reserve_price?: number
+  reservePrice?: number
   top_bid?: number
+  topBid?: number
   highest_bid?: number
+  highestBid?: number
   bid_count?: number
+  bidCount?: number
   bids?: number
+  total_bids?: number
+  totalBids?: number
+  max_bids?: number
+  maxBids?: number
+  bids_remaining?: number
+  bidsRemaining?: number
   ends_in?: string
+  endsIn?: string
+  time_remaining?: string
+  timeRemaining?: string
+  status?: number | string
 }
-
+//clean and normalized for FE
 type Listing = {
   id: number
   title: string
@@ -28,16 +48,79 @@ type Listing = {
   bidCount: number
   endsIn: string
 }
+//returns first vali str
+function firstString(...values: unknown[]): string | undefined {
+  return values.find((value): value is string => typeof value === 'string' && value.trim() !== '')
+}
+//first walid num and also like handles numbers as strings
+function firstNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
 
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value.replace('$', '').trim())
+
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+  }
+}
+// calculates bids rmaining 
+function formatBidsRemaining(listing: ApiListing): string | undefined {
+  const remaining = firstNumber(listing.bids_remaining, listing.bidsRemaining)
+
+  if (remaining !== undefined) {
+    return `${remaining} bids left`
+  }
+
+  const maxBids = firstNumber(listing.max_bids, listing.maxBids)
+  const bidCount = firstNumber(listing.bid_count, listing.bidCount, listing.total_bids, listing.totalBids, listing.bids)
+
+  if (maxBids !== undefined && bidCount !== undefined) {
+    return `${Math.max(maxBids - bidCount, 0)} bids left`
+  }
+}
+// converts backend listing to frontend object
 function normalizeListing(listing: ApiListing): Listing {
+  const bidCount = firstNumber(
+    listing.bid_count,
+    listing.bidCount,
+    listing.total_bids,
+    listing.totalBids,
+    listing.bids
+  )
+
   return {
-    id: listing.id ?? listing.listing_id ?? 0,
-    title: listing.title ?? listing.auction_title ?? 'Untitled listing',
-    category: listing.category ?? 'Textbooks',
-    seller: listing.seller_email ?? listing.seller ?? 'seller@lsu.edu',
-    price: listing.top_bid ?? listing.highest_bid ?? listing.price ?? listing.reserve_price ?? 0,
-    bidCount: listing.bid_count ?? listing.bids ?? 0,
-    endsIn: listing.ends_in ?? '2h 14m',
+    id: firstNumber(listing.id, listing.listing_id, listing.listingId) ?? 0,
+    title: firstString(
+      listing.title,
+      listing.auction_title,
+      listing.auctionTitle,
+      listing.product_name,
+      listing.productName
+    ) ?? 'Untitled listing',
+    category: firstString(listing.category) ?? 'Textbooks',
+    seller: firstString(listing.seller_email, listing.sellerEmail, listing.seller) ?? 'seller@lsu.edu',
+    price: firstNumber(
+      listing.highest_bid,
+      listing.highestBid,
+      listing.top_bid,
+      listing.topBid,
+      listing.price,
+      listing.reserve_price,
+      listing.reservePrice
+    ) ?? 0,
+    bidCount: bidCount ?? 0,
+    endsIn: firstString(
+      listing.ends_in,
+      listing.endsIn,
+      listing.time_remaining,
+      listing.timeRemaining,
+      formatBidsRemaining(listing)
+    ) ?? '2h 14m',
   }
 }
 
@@ -47,8 +130,7 @@ export default function ListingsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  //Load listings once when this page opens.
+// fetching listing from BE when components munt , everything is normalized before storing
   useEffect(() => {
     async function fetchListings() {
       try {
@@ -70,7 +152,7 @@ export default function ListingsPage() {
 
     fetchListings()
   }, [])
-
+//vfilter listing based on input matches everything like title , category and seller
   const filteredListings = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
 
@@ -137,12 +219,9 @@ export default function ListingsPage() {
             {filteredListings.map((listing) => (
               <article key={listing.id} style={styles.listing}>
                 <div style={styles.imageFrame} aria-hidden="true">
-                  <div style={styles.imageSky} />
-                  <div style={styles.imageMountainLarge} />
-                  <div style={styles.imageMountainSmall} />
-                  <div style={styles.imageSun} />
+                  <span style={styles.imagePlaceholder}>Image Table</span>
                 </div>
-
+                {/* Listing detail */}
                 <div style={styles.listingBody}>
                   <div style={styles.badgeRow}>
                     <span style={styles.badge}>{listing.category}</span>
@@ -153,7 +232,7 @@ export default function ListingsPage() {
                     Listed by <span style={styles.seller}>{listing.seller}</span>
                   </p>
                 </div>
-
+                {/* Bidding info section */}
                 <div style={styles.bidInfo}>
                   <span style={styles.priceLabel}>Top Bid</span>
                   <strong style={styles.price}>${listing.price.toFixed(2)}</strong>
@@ -276,12 +355,18 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #2a3d58',
     borderRadius: '4px',
   },
-  imageSky: {
-    position: 'absolute',
-    inset: '10px',
-    border: '6px solid rgba(232, 237, 244, .28)',
-    borderRadius: '3px',
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#7a8fa8',
+    fontSize: '.9rem',
+    fontWeight: 600,
+    letterSpacing: '.05em',
   },
+  
   imageMountainLarge: {
     position: 'absolute',
     left: '26px',
@@ -406,4 +491,5 @@ const styles: Record<string, CSSProperties> = {
     color: '#eb5757',
     textAlign: 'center',
   },
+  
 }
