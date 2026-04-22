@@ -5,7 +5,7 @@ from services.notification_service import create_notification
 
 def place_bid(bidder_email: str, seller_email: str,
               listing_id: int, bid_price: float) -> dict:
-    listing = db.session.get(AuctionListings, (seller_email, listing_id))
+    listing = db.session.get(AuctionListings, (seller_email, listing_id))7
     if not listing:
         return {'success': False, 'error': 'Listing not found'}
     if listing.status != 1:
@@ -62,11 +62,11 @@ def place_bid(bidder_email: str, seller_email: str,
 def get_bids_by_bidder(bidder_email: str) -> list:
     bids = (Bids.query
             .filter_by(bidder_email=bidder_email)
+            .order_by(Bids.bid_price.desc())
             .all())
 
-    # Group by (seller_email, listing_id) — keep only each bidder's highest bid per listing
     seen = {}
-    for bid in sorted(bids, key=lambda b: b.bid_price, reverse=True):
+    for bid in bids:
         key = (bid.seller_email, bid.listing_id)
         if key not in seen:
             seen[key] = bid

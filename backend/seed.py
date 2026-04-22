@@ -50,9 +50,6 @@ def seed(table, data, size):
 
 
 def _add_column_if_missing(table: str, column: str, definition: str):
-    """Add a column to an existing table if it does not already exist.
-    Uses INFORMATION_SCHEMA so it is safe to call on every startup.
-    """
     exists = db.session.execute(db.text(
         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
         "WHERE TABLE_SCHEMA = DATABASE() "
