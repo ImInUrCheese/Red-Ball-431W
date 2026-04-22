@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from services.listing_service import (
-    get_subcategories, get_listings_by_category, get_listing_detail,
+    get_subcategories, get_leaf_categories, get_listings_by_category, get_listing_detail,
     get_seller_listings, create_listing, update_listing,
     deactivate_listing, upload_listing_image, search_listings,
     get_seller_active_listings, get_seller_sales_history
@@ -11,6 +11,10 @@ listings_bp = Blueprint('listings', __name__)
 @listings_bp.route('/categories/<parent_category>', methods=['GET'])
 def categories(parent_category):
     return jsonify(get_subcategories(parent_category)), 200
+
+@listings_bp.route('/categories/leaf', methods=['GET'])
+def leaf_categories():
+    return jsonify(get_leaf_categories()), 200
 
 @listings_bp.route('/listings/category/<category_name>', methods=['GET'])
 def listings_by_category(category_name):

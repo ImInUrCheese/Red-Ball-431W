@@ -1,24 +1,26 @@
 from database import db
 from model.users import Users, Bidders, Sellers, Helpdesk
+from model.address import CreditCards
 from services.image_service import save_image, get_image_url
 
 
 def authenticate(email: str, password_hash: str) -> dict:
     user = db.session.get(Users, email)
     if user and user.password == password_hash:
-        role = _get_role(email)
-        return {'success': True, 'role': role}
+        roles = get_roles(email)
+        return {'success': True, 'roles': roles}
     return {'success': False, 'error': 'Invalid email or password'}
 
 
-def _get_role(email: str) -> str:
+def get_roles(email: str) -> list:
+    roles = []
     if db.session.get(Helpdesk, email):
-        return 'helpdesk'
+        roles.append('helpdesk')
     if db.session.get(Sellers, email):
-        return 'seller'
+        roles.append('seller')
     if db.session.get(Bidders, email):
-        return 'bidder'
-    return 'unknown'
+        roles.append('bidder')
+    return roles
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +112,18 @@ def get_helpdesk_profile(email: str) -> dict | None:
         'email': staff.email,
         'position': staff.position,
         'image_url': get_image_url(user.image_filename),
+    }
+
+
+def get_payment_info(email: str) -> dict | None:
+    card = CreditCards.query.filter_by(owner_email=email).first()
+    if not card:
+        return None
+    return {
+        'card_type':     card.card_type.strip(),
+        'last_four':     card.credit_card_num.replace('-', '')[-4:],
+        'expire_month':  card.expire_month,
+        'expire_year':   card.expire_year,
     }
 
 

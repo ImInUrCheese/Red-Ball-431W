@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { UserRole } from '../../api/auth'
+import { getProfile } from '../../api/user'
 import './LandingPageHeader.css'
 
 // ── Types ────────────────────────────────────────────────────
@@ -31,8 +32,17 @@ export default function Header({
   onLogout,
 }: HeaderProps) {
   const [bellOpen, setBellOpen] = useState(false)
+  const [displayName, setDisplayName] = useState<string>(userName)
   const bellRef = useRef<HTMLDivElement>(null)
   const unseenCount = notifications.filter(n => !n.seen).length
+
+  useEffect(() => {
+    getProfile().then(p => {
+      if (p.first_name || p.last_name) {
+        setDisplayName([p.first_name, p.last_name].filter(Boolean).join(' '))
+      }
+    }).catch(() => {})
+  }, [userName])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -56,8 +66,8 @@ export default function Header({
 
       {/* Center — name + role */}
       <div className="header-center">
-        <span className="header-username">{userName}</span>
-        
+        <span className="header-username">{displayName}</span>
+        <span className="header-role-badge">{role}</span>
       </div>
 
       {/* Right — actions */}

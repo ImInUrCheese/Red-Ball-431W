@@ -9,18 +9,37 @@ from sqlalchemy import or_
 # ---------------------------------------------------------------------------
 
 def get_subcategories(parent_category: str) -> list:
+    # 'Root' is an internal seeder node; treat 'All' and 'Root' as equivalent
+    effective = 'Root' if parent_category == 'All' else parent_category
     cats = (Categories.query
-            .filter_by(parent_category=parent_category)
+            .filter_by(parent_category=effective)
             .order_by(Categories.category_name)
             .all())
     return [c.category_name for c in cats]
 
 
+def get_leaf_categories() -> list:
+    parent_names = db.session.query(Categories.parent_category).distinct().subquery()
+    leaves = (Categories.query
+              .filter(~Categories.category_name.in_(parent_names))
+              .order_by(Categories.category_name)
+              .all())
+    return [c.category_name for c in leaves]
+
+
 def get_listings_by_category(category_name: str) -> list:
+    from services.bid_service import get_listing_bids
     listings = (AuctionListings.query
                 .filter_by(category=category_name, status=1)
                 .all())
-    return [_serialize_listing(l) for l in listings]
+    result = []
+    for l in listings:
+        s = _serialize_listing(l)
+        bid_info = get_listing_bids(l.seller_email, l.listing_id)
+        if bid_info:
+            s.update(bid_info)
+        result.append(s)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +252,15 @@ def search_listings(keyword: str = None, min_price: float = None,
     if max_price is not None:
         query = query.filter(AuctionListings.reserve_price <= max_price)
 
-    return [_serialize_listing(l) for l in query.all()]
+    from services.bid_service import get_listing_bids
+    result = []
+    for l in query.all():
+        s = _serialize_listing(l)
+        bid_info = get_listing_bids(l.seller_email, l.listing_id)
+        if bid_info:
+            s.update(bid_info)
+        result.append(s)
+    return result
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from services.bid_service import place_bid, get_listing_bids, check_auction_complete, get_bids_by_bidder
+from services.bid_service import place_bid, get_listing_bids, get_bid_history, check_auction_complete, get_bids_by_bidder
 
 bids_bp = Blueprint('bids', __name__)
 
@@ -17,6 +17,13 @@ def post_bid():
 @bids_bp.route('/bids/<seller_email>/<int:listing_id>', methods=['GET'])
 def get_bids(seller_email, listing_id):
     result = get_listing_bids(seller_email, listing_id)
+    if result is None:
+        return jsonify({'error': 'Listing not found'}), 404
+    return jsonify(result), 200
+
+@bids_bp.route('/bids/<seller_email>/<int:listing_id>/history', methods=['GET'])
+def get_bids_history(seller_email, listing_id):
+    result = get_bid_history(seller_email, listing_id)
     if result is None:
         return jsonify({'error': 'Listing not found'}), 404
     return jsonify(result), 200

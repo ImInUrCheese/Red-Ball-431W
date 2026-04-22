@@ -1,60 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { getProfile, getPaymentInfo, updateProfile, changePassword } from '../api/user'
 
-type AccountForm = {
-  firstName: string
-  lastName: string
-  email: string
-  phone: string
-  streetNumber: string
-  streetName: string
-  city: string
-  state: string
-  zipCode: string
-  major: string
-  age: string
-  cardType: string
-  cardLastFour: string
-  expireMonth: string
-  expireYear: string
-  bankRoutingNumber: string
-  bankAccountNumber: string
-  currentPassword: string
-  newPassword: string
-  confirmPassword: string
-}
-
-type SettingsTab = 'profile' | 'payment' | 'password' | 'sellerInfo'
+type SettingsTab = 'profile' | 'payment' | 'sellerInfo' | 'password'
 
 const allTabs: { id: SettingsTab; icon: string; label: string; roles: string[] }[] = [
   { id: 'profile',    icon: 'P', label: 'Profile',     roles: ['bidder', 'seller', 'helpdesk'] },
-  { id: 'payment',   icon: '$', label: 'Payment',     roles: ['bidder'] },
-  { id: 'password',  icon: '*', label: 'Password',    roles: ['bidder', 'seller', 'helpdesk'] },
+  { id: 'payment',    icon: '$', label: 'Payment',     roles: ['bidder'] },
   { id: 'sellerInfo', icon: 'S', label: 'Seller Info', roles: ['seller'] },
+  { id: 'password',   icon: '*', label: 'Password',    roles: ['bidder', 'seller', 'helpdesk'] },
 ]
-
-const initialForm: AccountForm = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  phone: '(814) 555-0192',
-  streetNumber: '173',
-  streetName: 'College Ave',
-  city: 'State College',
-  state: 'PA',
-  zipCode: '16801',
-  major: 'Computer Science',
-  age: '21',
-  cardType: 'Visa',
-  cardLastFour: '4242',
-  expireMonth: '05',
-  expireYear: '2028',
-  bankRoutingNumber: '021000021',
-  bankAccountNumber: '000123456789',
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-}
 
 interface AccountSettingsProps {
   userName: string
@@ -62,374 +17,259 @@ interface AccountSettingsProps {
   onBack: () => void
 }
 
+type StatusState = { msg: string; ok: boolean } | null
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={s.field}>
+      <label style={s.label}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
 export default function AccountSettingsPage({ userName, role, onBack }: AccountSettingsProps) {
   const tabs = allTabs.filter(t => t.roles.includes(role))
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
-  const [status, setStatus] = useState('')
-  const [form, setForm] = useState<AccountForm>(() => ({ ...initialForm, email: userName }))
 
-  const fullName = `${form.firstName} ${form.lastName}`.trim()
+  // Profile state
+  const [firstName, setFirstName]   = useState('')
+  const [lastName, setLastName]     = useState('')
+  const [age, setAge]               = useState('')
+  const [major, setMajor]           = useState('')
+  const [routing, setRouting]       = useState('')
+  const [account, setAccount]       = useState('')
+  const [profileStatus, setProfileStatus] = useState<StatusState>(null)
+  const [saving, setSaving]         = useState(false)
+
+  // Payment (read-only)
+  const [payment, setPayment] = useState<{ card_type: string; last_four: string; expire_month: number; expire_year: number } | null>(null)
+
+  // Password state
+  const [newPassword, setNewPassword]         = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwStatus, setPwStatus]               = useState<StatusState>(null)
+  const [savingPw, setSavingPw]               = useState(false)
+
+  useEffect(() => {
+    getProfile().then(p => {
+      setFirstName(p.first_name ?? '')
+      setLastName(p.last_name ?? '')
+      setAge(p.age != null ? String(p.age) : '')
+      setMajor(p.major ?? '')
+      setRouting(p.bank_routing_number ?? '')
+      setAccount(p.bank_account_number ?? '')
+    }).catch(() => {})
+
+    if (role === 'bidder') {
+      getPaymentInfo().then(setPayment).catch(() => {})
+    }
+  }, [userName, role])
+
+  const fullName = [firstName, lastName].filter(Boolean).join(' ')
   const initials = useMemo(
-    () =>
-      [form.firstName, form.lastName]
-        .filter(Boolean)
-        .map((part) => part[0]?.toUpperCase())
-        .join('')
-        .slice(0, 2) || 'U',
-    [form.firstName, form.lastName],
+    () => [firstName, lastName].filter(Boolean).map(p => p[0].toUpperCase()).join('').slice(0, 2) || 'U',
+    [firstName, lastName],
   )
 
-  function updateField(field: keyof AccountForm, value: string) {
-    setForm((current) => ({ ...current, [field]: value }))
-    setStatus('')
+  async function handleSaveProfile() {
+    setSaving(true)
+    setProfileStatus(null)
+    try {
+      const payload = role === 'bidder'
+        ? { first_name: firstName, last_name: lastName, age: age ? parseInt(age, 10) : undefined, major: major || undefined }
+        : { bank_routing_number: routing || undefined, bank_account_number: account || undefined }
+      const res = await updateProfile(payload)
+      setProfileStatus({ msg: res.success ? 'Profile saved.' : (res.error ?? 'Failed to save.'), ok: res.success })
+    } catch {
+      setProfileStatus({ msg: 'Failed to save.', ok: false })
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function validateActiveTab() {
-    if (activeTab === 'profile') {
-      if (!form.firstName.trim() || !form.lastName.trim()) return 'First and last name are required.'
-      if (!Number.isInteger(Number(form.age)) || Number(form.age) < 18) {
-        return 'Age must be a whole number of at least 18.'
-      }
-      if (!form.zipCode.trim()) return 'Zip code is required.'
-    }
-
-    if (activeTab === 'payment') {
-      if (form.cardLastFour && !/^\d{4}$/.test(form.cardLastFour)) {
-        return 'Card last four must be exactly 4 digits.'
-      }
-      if (form.expireMonth && (Number(form.expireMonth) < 1 || Number(form.expireMonth) > 12)) {
-        return 'Expiration month must be between 1 and 12.'
-      }
-    }
-
-    if (activeTab === 'password') {
-      if (!form.currentPassword || !form.newPassword || !form.confirmPassword) {
-        return 'Fill out all password fields before saving.'
-      }
-      if (form.newPassword.length < 8) return 'New password must be at least 8 characters.'
-      if (form.newPassword !== form.confirmPassword) return 'New passwords do not match.'
-    }
-
-    if (activeTab === 'sellerInfo') {
-      if (!/^\d{9}$/.test(form.bankRoutingNumber)) return 'Routing number must be 9 digits.'
-      if (!/^\d{4,17}$/.test(form.bankAccountNumber)) {
-        return 'Account number must be 4 to 17 digits.'
-      }
-    }
-
-    return ''
-  }
-
-  function handleSubmit(event: React.SyntheticEvent) {
-    event.preventDefault()
-    const error = validateActiveTab()
-
-    if (error) {
-      setStatus(error)
+  async function handleChangePassword() {
+    if (!newPassword || !confirmPassword) {
+      setPwStatus({ msg: 'Both fields are required.', ok: false })
       return
     }
-
-    setStatus(`${tabs.find((tab) => tab.id === activeTab)?.label} changes saved locally.`)
+    if (newPassword !== confirmPassword) {
+      setPwStatus({ msg: 'Passwords do not match.', ok: false })
+      return
+    }
+    if (newPassword.length < 6) {
+      setPwStatus({ msg: 'Password must be at least 6 characters.', ok: false })
+      return
+    }
+    setSavingPw(true)
+    setPwStatus(null)
+    try {
+      const res = await changePassword(newPassword)
+      setPwStatus({ msg: res.success ? 'Password updated.' : (res.error ?? 'Failed to update.'), ok: res.success })
+      if (res.success) { setNewPassword(''); setConfirmPassword('') }
+    } catch {
+      setPwStatus({ msg: 'Failed to update.', ok: false })
+    } finally {
+      setSavingPw(false)
+    }
   }
 
   return (
-    <div style={styles.page}>
-      <main style={styles.main}>
-        <header style={styles.profileHeader}>
-          <button type="button" style={styles.backButton} onClick={onBack}>← Back</button>
-          <div style={styles.avatar}>{initials || form.email[0]?.toUpperCase() || 'U'}</div>
-          <div style={styles.profileTitleBlock}>
-            <p style={styles.eyebrow}>Account Settings</p>
-            <h1 style={styles.name}>{fullName || form.email}</h1>
-            <p style={styles.emailLine}>{form.email} · {role}</p>
+    <div style={s.page}>
+      <main style={s.main}>
+        <header style={s.profileHeader}>
+          <button type="button" style={s.backButton} onClick={onBack}>← Back</button>
+          <div style={s.avatar}>{initials}</div>
+          <div style={s.profileTitleBlock}>
+            <p style={s.eyebrow}>Account Settings</p>
+            <h1 style={s.name}>{fullName || userName}</h1>
+            <p style={s.emailLine}>{userName} · {role}</p>
           </div>
         </header>
 
-        <div style={styles.content}>
-          <aside style={styles.sidebar} aria-label="Account settings">
-            {tabs.map((tab) => {
+        <div style={s.content}>
+          <aside style={s.sidebar}>
+            {tabs.map(tab => {
               const isActive = tab.id === activeTab
-
               return (
                 <button
                   key={tab.id}
                   type="button"
-                  style={{
-                    ...styles.tabButton,
-                    ...(isActive ? styles.tabButtonActive : {}),
-                  }}
-                  onClick={() => {
-                    setStatus('')
-                    setActiveTab(tab.id)
-                  }}
+                  style={{ ...s.tabButton, ...(isActive ? s.tabButtonActive : {}) }}
+                  onClick={() => { setActiveTab(tab.id); setProfileStatus(null); setPwStatus(null) }}
                 >
-                  <span style={{ ...styles.tabIcon, ...(isActive ? styles.tabIconActive : {}) }}>
-                    {tab.icon}
-                  </span>
+                  <span style={{ ...s.tabIcon, ...(isActive ? s.tabIconActive : {}) }}>{tab.icon}</span>
                   {tab.label}
                 </button>
               )
             })}
           </aside>
 
-          <form style={styles.card} onSubmit={handleSubmit}>
+          <div style={s.card}>
+
+            {/* ── Profile tab ── */}
             {activeTab === 'profile' && (
-              <>
-                <section style={styles.section}>
-                  <h2 style={styles.sectionTitle}>Personal Information</h2>
-                  <div style={styles.fieldRow}>
-                    <label style={styles.field}>
-                      <span style={styles.label}>First Name</span>
-                      <input
-                        style={styles.input}
-                        value={form.firstName}
-                        onChange={(event) => updateField('firstName', event.target.value)}
-                      />
-                    </label>
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>Personal Information</h2>
 
-                    <label style={styles.field}>
-                      <span style={styles.label}>Last Name</span>
-                      <input
-                        style={styles.input}
-                        value={form.lastName}
-                        onChange={(event) => updateField('lastName', event.target.value)}
-                      />
-                    </label>
+                {/* Email — always read-only */}
+                <Field label="Email Address">
+                  <span style={s.readonlyValue}>{userName}</span>
+                  <span style={s.hint}>Email can only be changed via a helpdesk request.</span>
+                </Field>
+
+                {role === 'bidder' && (
+                  <>
+                    <div style={s.fieldRow}>
+                      <Field label="First Name">
+                        <input style={s.input} value={firstName} onChange={e => setFirstName(e.target.value)} />
+                      </Field>
+                      <Field label="Last Name">
+                        <input style={s.input} value={lastName} onChange={e => setLastName(e.target.value)} />
+                      </Field>
+                    </div>
+                    <div style={s.fieldRow}>
+                      <Field label="Age">
+                        <input style={s.input} type="number" min="1" value={age} onChange={e => setAge(e.target.value)} />
+                      </Field>
+                      <Field label="Major (optional)">
+                        <input style={s.input} value={major} onChange={e => setMajor(e.target.value)} placeholder="e.g. Computer Science" />
+                      </Field>
+                    </div>
+                  </>
+                )}
+
+                {profileStatus && (
+                  <p style={profileStatus.ok ? s.successText : s.errorText}>{profileStatus.msg}</p>
+                )}
+
+                {role !== 'helpdesk' && (
+                  <div style={s.actions}>
+                    <button style={{ ...s.saveButton, opacity: saving ? 0.6 : 1 }} onClick={handleSaveProfile} disabled={saving}>
+                      {saving ? 'Saving…' : 'Save Changes'}
+                    </button>
                   </div>
-
-                  <label style={styles.field}>
-                    <span style={styles.label}>Email Address</span>
-                    <input style={{ ...styles.input, ...styles.readOnlyInput }} value={form.email} readOnly />
-                  </label>
-
-                  <label style={styles.field}>
-                    <span style={styles.label}>Phone Number</span>
-                    <input
-                      style={styles.input}
-                      value={form.phone}
-                      onChange={(event) => updateField('phone', event.target.value)}
-                    />
-                  </label>
-                </section>
-
-                <section style={{ ...styles.section, ...styles.sectionDivider }}>
-                  <h2 style={styles.sectionTitle}>Address</h2>
-                  <div style={styles.addressGrid}>
-                    <label style={styles.field}>
-                      <span style={styles.label}>Street No.</span>
-                      <input
-                        style={styles.input}
-                        value={form.streetNumber}
-                        onChange={(event) => updateField('streetNumber', event.target.value)}
-                      />
-                    </label>
-
-                    <label style={styles.field}>
-                      <span style={styles.label}>Street Name</span>
-                      <input
-                        style={styles.input}
-                        value={form.streetName}
-                        onChange={(event) => updateField('streetName', event.target.value)}
-                      />
-                    </label>
-                  </div>
-
-                  <div style={styles.locationGrid}>
-                    <label style={styles.field}>
-                      <span style={styles.label}>City</span>
-                      <input
-                        style={styles.input}
-                        value={form.city}
-                        onChange={(event) => updateField('city', event.target.value)}
-                      />
-                    </label>
-
-                    <label style={styles.field}>
-                      <span style={styles.label}>State</span>
-                      <input
-                        style={styles.input}
-                        value={form.state}
-                        onChange={(event) => updateField('state', event.target.value)}
-                      />
-                    </label>
-
-                    <label style={styles.field}>
-                      <span style={styles.label}>Zip</span>
-                      <input
-                        style={styles.input}
-                        value={form.zipCode}
-                        onChange={(event) => updateField('zipCode', event.target.value)}
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <section style={{ ...styles.section, ...styles.sectionDivider }}>
-                  <h2 style={styles.sectionTitle}>Academic Info</h2>
-                  <div style={styles.fieldRow}>
-                    <label style={styles.field}>
-                      <span style={styles.label}>Major</span>
-                      <input
-                        style={styles.input}
-                        value={form.major}
-                        onChange={(event) => updateField('major', event.target.value)}
-                      />
-                    </label>
-
-                    <label style={styles.field}>
-                      <span style={styles.label}>Age</span>
-                      <input
-                        style={styles.input}
-                        type="number"
-                        min="18"
-                        value={form.age}
-                        onChange={(event) => updateField('age', event.target.value)}
-                      />
-                    </label>
-                  </div>
-                </section>
-              </>
+                )}
+              </section>
             )}
 
+            {/* ── Payment tab (read-only) ── */}
             {activeTab === 'payment' && (
-              <section style={styles.section}>
-                <h2 style={styles.sectionTitle}>Payment Method</h2>
-                <div style={styles.paymentPreview}>
-                  <span>{form.cardType || 'Card'}</span>
-                  <strong>**** {form.cardLastFour || '0000'}</strong>
-                </div>
-
-                <div style={styles.fieldRow}>
-                  <label style={styles.field}>
-                    <span style={styles.label}>Card Type</span>
-                    <select
-                      style={styles.input}
-                      value={form.cardType}
-                      onChange={(event) => updateField('cardType', event.target.value)}
-                    >
-                      <option value="Visa">Visa</option>
-                      <option value="Mastercard">Mastercard</option>
-                      <option value="Discover">Discover</option>
-                      <option value="American Express">American Express</option>
-                    </select>
-                  </label>
-
-                  <label style={styles.field}>
-                    <span style={styles.label}>Last Four</span>
-                    <input
-                      style={styles.input}
-                      value={form.cardLastFour}
-                      maxLength={4}
-                      onChange={(event) => updateField('cardLastFour', event.target.value.replace(/\D/g, ''))}
-                    />
-                  </label>
-                </div>
-
-                <div style={styles.fieldRow}>
-                  <label style={styles.field}>
-                    <span style={styles.label}>Expire Month</span>
-                    <input
-                      style={styles.input}
-                      value={form.expireMonth}
-                      maxLength={2}
-                      onChange={(event) => updateField('expireMonth', event.target.value.replace(/\D/g, ''))}
-                    />
-                  </label>
-
-                  <label style={styles.field}>
-                    <span style={styles.label}>Expire Year</span>
-                    <input
-                      style={styles.input}
-                      value={form.expireYear}
-                      maxLength={4}
-                      onChange={(event) => updateField('expireYear', event.target.value.replace(/\D/g, ''))}
-                    />
-                  </label>
-                </div>
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>Payment Method</h2>
+                {payment ? (
+                  <>
+                    <div style={s.paymentPreview}>
+                      <span>{payment.card_type}</span>
+                      <strong>**** {payment.last_four}</strong>
+                    </div>
+                    <div style={s.fieldRow}>
+                      <Field label="Card Type"><span style={s.readonlyValue}>{payment.card_type}</span></Field>
+                      <Field label="Last Four"><span style={s.readonlyValue}>{payment.last_four}</span></Field>
+                    </div>
+                    <div style={s.fieldRow}>
+                      <Field label="Expiry Month"><span style={s.readonlyValue}>{String(payment.expire_month).padStart(2, '0')}</span></Field>
+                      <Field label="Expiry Year"><span style={s.readonlyValue}>{payment.expire_year}</span></Field>
+                    </div>
+                    <p style={s.hint}>To update payment info, submit a helpdesk request.</p>
+                  </>
+                ) : (
+                  <p style={s.muted}>No payment method on file.</p>
+                )}
               </section>
             )}
 
-            {activeTab === 'password' && (
-              <section style={styles.section}>
-                <h2 style={styles.sectionTitle}>Password</h2>
-                <label style={styles.field}>
-                  <span style={styles.label}>Current Password</span>
-                  <input
-                    style={styles.input}
-                    type="password"
-                    value={form.currentPassword}
-                    onChange={(event) => updateField('currentPassword', event.target.value)}
-                  />
-                </label>
-
-                <label style={styles.field}>
-                  <span style={styles.label}>New Password</span>
-                  <input
-                    style={styles.input}
-                    type="password"
-                    value={form.newPassword}
-                    onChange={(event) => updateField('newPassword', event.target.value)}
-                  />
-                </label>
-
-                <label style={styles.field}>
-                  <span style={styles.label}>Confirm New Password</span>
-                  <input
-                    style={styles.input}
-                    type="password"
-                    value={form.confirmPassword}
-                    onChange={(event) => updateField('confirmPassword', event.target.value)}
-                  />
-                </label>
-              </section>
-            )}
-
+            {/* ── Seller Info tab ── */}
             {activeTab === 'sellerInfo' && (
-              <section style={styles.section}>
-                <h2 style={styles.sectionTitle}>Seller Payout Info</h2>
-                <div style={styles.callout}>
-                  Balance and payout updates are local only until backend account routes are added.
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>Seller Payout Info</h2>
+                <Field label="Bank Routing Number">
+                  <input style={s.input} value={routing} onChange={e => setRouting(e.target.value)} placeholder="9-digit routing number" />
+                </Field>
+                <Field label="Bank Account Number">
+                  <input style={s.input} value={account} onChange={e => setAccount(e.target.value)} placeholder="Account number" />
+                </Field>
+
+                {profileStatus && (
+                  <p style={profileStatus.ok ? s.successText : s.errorText}>{profileStatus.msg}</p>
+                )}
+                <div style={s.actions}>
+                  <button style={{ ...s.saveButton, opacity: saving ? 0.6 : 1 }} onClick={handleSaveProfile} disabled={saving}>
+                    {saving ? 'Saving…' : 'Save Changes'}
+                  </button>
                 </div>
-
-                <label style={styles.field}>
-                  <span style={styles.label}>Bank Routing Number</span>
-                  <input
-                    style={styles.input}
-                    value={form.bankRoutingNumber}
-                    maxLength={9}
-                    onChange={(event) => updateField('bankRoutingNumber', event.target.value.replace(/\D/g, ''))}
-                  />
-                </label>
-
-                <label style={styles.field}>
-                  <span style={styles.label}>Bank Account Number</span>
-                  <input
-                    style={styles.input}
-                    value={form.bankAccountNumber}
-                    maxLength={17}
-                    onChange={(event) => updateField('bankAccountNumber', event.target.value.replace(/\D/g, ''))}
-                  />
-                </label>
               </section>
             )}
 
-            {status && (
-              <p style={status.includes('saved') ? styles.successText : styles.errorText}>{status}</p>
-            )}
+            {/* ── Password tab ── */}
+            {activeTab === 'password' && (
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>Change Password</h2>
+                <Field label="New Password">
+                  <input style={s.input} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="••••••••" />
+                </Field>
+                <Field label="Confirm New Password">
+                  <input style={s.input} type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" />
+                </Field>
 
-            <div style={styles.actions}>
-              <button style={styles.saveButton} type="submit">
-                Save Locally
-              </button>
-            </div>
-          </form>
+                {pwStatus && (
+                  <p style={pwStatus.ok ? s.successText : s.errorText}>{pwStatus.msg}</p>
+                )}
+                <div style={s.actions}>
+                  <button style={{ ...s.saveButton, opacity: savingPw ? 0.6 : 1 }} onClick={handleChangePassword} disabled={savingPw}>
+                    {savingPw ? 'Updating…' : 'Update Password'}
+                  </button>
+                </div>
+              </section>
+            )}
+          </div>
         </div>
       </main>
     </div>
   )
 }
 
-const styles: Record<string, CSSProperties> = {
+const s: Record<string, CSSProperties> = {
   page: {
     minHeight: '100vh',
     background: '#0b1521',
@@ -471,9 +311,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '20px',
     fontWeight: 900,
   },
-  profileTitleBlock: {
-    minWidth: 0,
-  },
+  profileTitleBlock: { minWidth: 0 },
   eyebrow: {
     margin: '0 0 6px',
     color: '#5ba4d4',
@@ -488,7 +326,6 @@ const styles: Record<string, CSSProperties> = {
     fontFamily: 'Georgia, "Times New Roman", serif',
     fontSize: '34px',
     fontWeight: 500,
-    letterSpacing: 0,
     lineHeight: 1.05,
   },
   emailLine: {
@@ -546,59 +383,38 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px',
     fontWeight: 900,
   },
-  tabIconActive: {
-    background: '#5ba4d4',
-    color: '#0b1521',
-  },
+  tabIconActive: { background: '#5ba4d4', color: '#0b1521' },
   card: {
-    minHeight: '510px',
+    minHeight: '400px',
     padding: '22px',
     background: '#152438',
     border: '1px solid #293d56',
     borderRadius: '8px',
-    boxShadow: '0 16px 40px rgba(0, 0, 0, .22)',
+    boxShadow: '0 16px 40px rgba(0,0,0,.22)',
   },
-  section: {
-    margin: 0,
-  },
-  sectionDivider: {
-    marginTop: '20px',
-    paddingTop: '20px',
-    borderTop: '1px solid #293d56',
-  },
+  section: { margin: 0 },
   sectionTitle: {
     margin: '0 0 18px',
     color: '#edf3f8',
     fontSize: '18px',
     fontWeight: 800,
-    letterSpacing: 0,
+  },
+  fieldRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '14px',
   },
   field: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '7px',
+    gap: '6px',
     marginBottom: '16px',
-  },
-  fieldRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '14px',
-  },
-  addressGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: '14px',
-  },
-  locationGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-    gap: '14px',
   },
   label: {
     color: '#9db0c2',
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 800,
-    letterSpacing: '.05em',
+    letterSpacing: '.07em',
     textTransform: 'uppercase',
   },
   input: {
@@ -613,9 +429,16 @@ const styles: Record<string, CSSProperties> = {
     font: '600 14px Inter, "Segoe UI", system-ui, sans-serif',
     outline: 'none',
   },
-  readOnlyInput: {
-    color: '#8fa5ba',
-    cursor: 'not-allowed',
+  readonlyValue: {
+    color: '#edf3f8',
+    fontSize: '15px',
+    fontWeight: 600,
+  },
+  hint: {
+    color: '#4a607a',
+    fontSize: '12px',
+    fontWeight: 500,
+    marginTop: '2px',
   },
   paymentPreview: {
     minHeight: '88px',
@@ -631,24 +454,19 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     fontWeight: 800,
   },
-  callout: {
-    marginBottom: '18px',
-    padding: '14px',
-    background: '#102033',
-    border: '1px solid #293d56',
-    borderRadius: '6px',
-    color: '#9db0c2',
+  muted: {
+    color: '#4a607a',
     fontSize: '14px',
-    fontWeight: 600,
-    lineHeight: 1.5,
+    fontStyle: 'italic',
+    margin: 0,
   },
   actions: {
     display: 'flex',
     justifyContent: 'flex-end',
-    marginTop: '18px',
+    marginTop: '8px',
   },
   saveButton: {
-    minWidth: '132px',
+    minWidth: '140px',
     minHeight: '44px',
     padding: '10px 18px',
     background: '#5ba4d4',
@@ -658,20 +476,19 @@ const styles: Record<string, CSSProperties> = {
     font: '900 14px Inter, "Segoe UI", system-ui, sans-serif',
     cursor: 'pointer',
   },
-  errorText: {
-    margin: '10px 0 0',
-    color: '#ff8c8c',
-    fontSize: '13px',
-    fontWeight: 800,
-    lineHeight: 1.35,
-  },
   successText: {
-    margin: '10px 0 0',
-    padding: '12px',
+    margin: '0 0 12px',
+    padding: '10px 12px',
     background: '#12324a',
     border: '1px solid #2d6a9f',
     borderRadius: '6px',
     color: '#7dbde8',
+    fontSize: '13px',
+    fontWeight: 800,
+  },
+  errorText: {
+    margin: '0 0 12px',
+    color: '#ff8c8c',
     fontSize: '13px',
     fontWeight: 800,
   },

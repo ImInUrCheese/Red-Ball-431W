@@ -100,6 +100,17 @@ def get_bids_by_bidder(bidder_email: str) -> list:
     return result
 
 
+def get_bid_history(seller_email: str, listing_id: int) -> list | None:
+    listing = db.session.get(AuctionListings, (seller_email, listing_id))
+    if not listing:
+        return None
+    bids = (Bids.query
+            .filter_by(seller_email=seller_email, listing_id=listing_id)
+            .order_by(Bids.bid_price.desc())
+            .all())
+    return [{'bidder_email': b.bidder_email, 'bid_price': b.bid_price} for b in bids]
+
+
 def get_listing_bids(seller_email: str, listing_id: int) -> dict:
     listing = db.session.get(AuctionListings, (seller_email, listing_id))
     if not listing:

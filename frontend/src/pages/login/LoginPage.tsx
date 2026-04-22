@@ -1,16 +1,34 @@
 import { useState } from 'react'
-import { login } from '../../api/auth'
+import { login, register } from '../../api/auth'
 import type { UserRole } from '../../api/auth'
 import './LoginPage.css'
 
 type Tab = 'signin' | 'register'
 type Toast = { message: string; success: boolean } | null
 
-export default function LoginPage({ onLogin }: { onLogin: (role: UserRole, email: string) => void }) {
+export default function LoginPage({ onLogin }: { onLogin: (roles: UserRole[], email: string) => void }) {
   const [tab, setTab] = useState<Tab>('signin')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [toast, setToast] = useState<Toast>(null)
+
+  // sign-in state
+  const [siEmail, setSiEmail] = useState('')
+  const [siPassword, setSiPassword] = useState('')
+
+  // register state
+  const [regRole, setRegRole] = useState<UserRole>('bidder')
+  const [regEmail, setRegEmail] = useState('')
+  const [regPassword, setRegPassword] = useState('')
+  const [regConfirm, setRegConfirm] = useState('')
+  // bidder fields
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [age, setAge] = useState('')
+  const [major, setMajor] = useState('')
+  // seller fields
+  const [routingNum, setRoutingNum] = useState('')
+  const [accountNum, setAccountNum] = useState('')
+  // helpdesk fields
+  const [position, setPosition] = useState('')
 
   function showToast(message: string, success: boolean) {
     setToast({ message, success })
@@ -18,15 +36,54 @@ export default function LoginPage({ onLogin }: { onLogin: (role: UserRole, email
   }
 
   async function handleSignIn() {
-    if (!email || !password) {
+    if (!siEmail || !siPassword) {
       showToast('Please enter your email and password.', false)
       return
     }
-    const data = await login(email, password)
-    if (data.success && data.role) {
-      onLogin(data.role, email.trim().toLowerCase())
+    const data = await login(siEmail, siPassword)
+    if (data.success && data.roles && data.roles.length > 0) {
+      onLogin(data.roles, siEmail.trim().toLowerCase())
     } else {
       showToast(data.error || 'Invalid email or password.', false)
+    }
+  }
+
+  async function handleRegister() {
+    if (!regEmail || !regPassword) {
+      showToast('Email and password are required.', false)
+      return
+    }
+    if (regPassword !== regConfirm) {
+      showToast('Passwords do not match.', false)
+      return
+    }
+    if (regRole === 'bidder' && (!firstName || !lastName || !age)) {
+      showToast('First name, last name, and age are required.', false)
+      return
+    }
+    if (regRole === 'seller' && (!routingNum || !accountNum)) {
+      showToast('Routing number and account number are required.', false)
+      return
+    }
+    if (regRole === 'helpdesk' && !position) {
+      showToast('Position is required.', false)
+      return
+    }
+
+    const data = await register({
+      role: regRole,
+      email: regEmail,
+      password: regPassword,
+      ...(regRole === 'bidder' && { first_name: firstName, last_name: lastName, age: parseInt(age, 10), major: major || undefined }),
+      ...(regRole === 'seller' && { bank_routing_number: routingNum, bank_account_number: accountNum }),
+      ...(regRole === 'helpdesk' && { position }),
+    })
+
+    if (data.success && data.role) {
+      showToast('Account created! Redirecting…', true)
+      setTimeout(() => onLogin([data.role!], regEmail.trim().toLowerCase()), 1200)
+    } else {
+      showToast(data.error || 'Registration failed.', false)
     }
   }
 
@@ -71,23 +128,24 @@ export default function LoginPage({ onLogin }: { onLogin: (role: UserRole, email
           {tab === 'signin' ? (
             <div>
               <div className="form-group">
-                <label htmlFor="email">LSU Email Address</label>
+                <label htmlFor="si-email">LSU Email Address</label>
                 <input
                   type="email"
-                  id="email"
+                  id="si-email"
                   placeholder="yourname@lsu.edu"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  value={siEmail}
+                  onChange={e => setSiEmail(e.target.value)}
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="password">Password</label>
+                <label htmlFor="si-password">Password</label>
                 <input
                   type="password"
-                  id="password"
+                  id="si-password"
                   placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  value={siPassword}
+                  onChange={e => setSiPassword(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSignIn()}
                 />
               </div>
               <button className="btn-primary" onClick={handleSignIn}>
@@ -95,8 +153,146 @@ export default function LoginPage({ onLogin }: { onLogin: (role: UserRole, email
               </button>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '1.1rem', letterSpacing: '.05em' }}>
-              Coming Soon
+            <div>
+              {/* Role selector */}
+              <div className="form-group">
+                <label>Account Type</label>
+                <div className="tabs" style={{ marginBottom: 0 }}>
+                  {(['bidder', 'seller'] as UserRole[]).map(r => (
+                    <button
+                      key={r}
+                      className={`tab-btn${regRole === r ? ' active' : ''}`}
+                      onClick={() => setRegRole(r)}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Common fields */}
+              <div className="form-group" style={{ marginTop: '1.3rem' }}>
+                <label htmlFor="reg-email">LSU Email Address</label>
+                <input
+                  type="email"
+                  id="reg-email"
+                  placeholder="yourname@lsu.edu"
+                  value={regEmail}
+                  onChange={e => setRegEmail(e.target.value)}
+                />
+              </div>
+              <div className="name-row">
+                <div className="form-group">
+                  <label htmlFor="reg-password">Password</label>
+                  <input
+                    type="password"
+                    id="reg-password"
+                    placeholder="••••••••"
+                    value={regPassword}
+                    onChange={e => setRegPassword(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="reg-confirm">Confirm Password</label>
+                  <input
+                    type="password"
+                    id="reg-confirm"
+                    placeholder="••••••••"
+                    value={regConfirm}
+                    onChange={e => setRegConfirm(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Bidder fields */}
+              {regRole === 'bidder' && (
+                <>
+                  <div className="name-row">
+                    <div className="form-group">
+                      <label htmlFor="first-name">First Name</label>
+                      <input
+                        id="first-name"
+                        placeholder="Jane"
+                        value={firstName}
+                        onChange={e => setFirstName(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="last-name">Last Name</label>
+                      <input
+                        id="last-name"
+                        placeholder="Doe"
+                        value={lastName}
+                        onChange={e => setLastName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="name-row">
+                    <div className="form-group">
+                      <label htmlFor="age">Age</label>
+                      <input
+                        id="age"
+                        type="number"
+                        min="16"
+                        placeholder="21"
+                        value={age}
+                        onChange={e => setAge(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="major">Major (optional)</label>
+                      <input
+                        id="major"
+                        placeholder="Computer Science"
+                        value={major}
+                        onChange={e => setMajor(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Seller fields */}
+              {regRole === 'seller' && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="routing">Bank Routing Number</label>
+                    <input
+                      id="routing"
+                      placeholder="021000021"
+                      value={routingNum}
+                      onChange={e => setRoutingNum(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="account">Bank Account Number</label>
+                    <input
+                      id="account"
+                      placeholder="123456789"
+                      value={accountNum}
+                      onChange={e => setAccountNum(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Helpdesk fields */}
+              {regRole === 'helpdesk' && (
+                <div className="form-group">
+                  <label htmlFor="position">Position / Title</label>
+                  <input
+                    id="position"
+                    placeholder="Support Specialist"
+                    value={position}
+                    onChange={e => setPosition(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <button className="btn-primary" onClick={handleRegister}>
+                Create Account &rarr;
+              </button>
             </div>
           )}
         </div>

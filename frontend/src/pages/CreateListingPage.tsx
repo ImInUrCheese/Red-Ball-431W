@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, DragEvent } from 'react'
+import { getLeafCategories, createListing, uploadListingImage } from '../api/listings'
 
 type ListingForm = {
   auctionTitle: string
@@ -13,17 +14,6 @@ type ListingForm = {
 }
 
 type Step = 1 | 2 | 3
-
-const categories = [
-  'Books',
-  'Electronics',
-  'Furniture',
-  'Clothing',
-  'Tickets',
-  'Kitchen',
-  'Sports',
-  'Other',
-]
 
 const steps: { id: Step; label: string }[] = [
   { id: 1, label: 'Item' },
@@ -47,12 +37,21 @@ interface CreateListingProps {
   onBack: () => void
 }
 
-export default function CreateListingPage({ onBack }: CreateListingProps) {
+export default function CreateListingPage({ userName, onBack }: CreateListingProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const photoFileRef = useRef<File | null>(null)
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [photoError, setPhotoError] = useState('')
   const [status, setStatus] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState<ListingForm>(initialForm)
+  const [categories, setCategories] = useState<string[]>([])
+
+  useEffect(() => {
+    getLeafCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]))
+  }, [])
 
   const reviewRows = useMemo(
     () => [
@@ -137,7 +136,7 @@ export default function CreateListingPage({ onBack }: CreateListingProps) {
     handlePhotoSelect(event.dataTransfer.files[0])
   }
 
-  function handleSubmit(event: React.SyntheticEvent) {
+  async function handleSubmit(event: React.SyntheticEvent) {
     event.preventDefault()
 
     if (currentStep !== 3) {
@@ -145,7 +144,25 @@ export default function CreateListingPage({ onBack }: CreateListingProps) {
       return
     }
 
-    setStatus('Listing draft is ready. Database submission is intentionally disabled for now.')
+    setSubmitting(true)
+    setStatus('')
+    try {
+      await createListing(
+        userName,
+        form.category,
+        form.auctionTitle,
+        form.productName,
+        form.description,
+        Number(form.quantity),
+        Number(form.reservePrice),
+        Number(form.maxBids),
+      )
+      setStatus('success')
+    } catch {
+      setStatus('Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -344,22 +361,37 @@ export default function CreateListingPage({ onBack }: CreateListingProps) {
               </section>
             )}
 
-            {status && (
-              <p style={status.includes('ready') ? styles.successText : styles.errorText}>{status}</p>
+            {status === 'success' && (
+              <p style={styles.successText}>Listing created successfully!</p>
+            )}
+            {status && status !== 'success' && (
+              <p style={styles.errorText}>{status}</p>
             )}
 
-            <div style={styles.actions}>
-              {currentStep > 1 && (
-                <button style={styles.secondaryButton} type="button" onClick={goToPreviousStep}>
-                  Back
+            {status === 'success' ? (
+              <div style={styles.actions}>
+                <button style={styles.secondaryButton} type="button" onClick={onBack}>
+                  Back to Listings
                 </button>
-              )}
-              <button style={styles.primaryButton} type="submit">
-                {currentStep === 1 && 'Continue'}
-                {currentStep === 2 && 'Review'}
-                {currentStep === 3 && 'Save Draft'}
-              </button>
-            </div>
+              </div>
+            ) : (
+              <div style={styles.actions}>
+                {currentStep > 1 && (
+                  <button style={styles.secondaryButton} type="button" onClick={goToPreviousStep}>
+                    Back
+                  </button>
+                )}
+                <button
+                  style={{ ...styles.primaryButton, opacity: submitting ? 0.6 : 1 }}
+                  type="submit"
+                  disabled={submitting}
+                >
+                  {currentStep === 1 && 'Continue'}
+                  {currentStep === 2 && 'Review'}
+                  {currentStep === 3 && (submitting ? 'Creating...' : 'Create Listing')}
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </main>

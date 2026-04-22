@@ -1,22 +1,51 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getMe, logout as apiLogout } from './api/auth'
 import type { UserRole } from './api/auth'
 import AccountSettingsPage from './pages/AccountSettingsPage'
+import BiddingPage from './pages/BiddingPage'
 import CreateListingPage from './pages/CreateListingPage'
 import HelpdeskLanding from './pages/HelpdeskLanding'
+import SubmitTicketPage from './pages/SubmitTicketPage'
+import RolePickerPage from './pages/login/RolePickerPage'
 import BidderLandingPage from './pages/Landing/BidderLandingPage'
 import SellerLandingPage from './pages/Landing/SellerLandingPage'
 import LoginPage from './pages/login/LoginPage'
 
-type Page = 'login' | UserRole | 'account' | 'createListing'
+type Page = 'login' | 'rolePicker' | UserRole | 'account' | 'createListing' | 'bidding' | 'submitTicket'
 
 export default function App() {
   const [page, setPage] = useState<Page>('login')
   const [userName, setUserName] = useState('')
   const [role, setRole] = useState<UserRole>('bidder')
+  const [pendingRoles, setPendingRoles] = useState<UserRole[]>([])
+  const [checking, setChecking] = useState(true)
+  const [selectedListing, setSelectedListing] = useState<{ sellerEmail: string; listingId: number } | null>(null)
+  const [listingRefreshKey, setListingRefreshKey] = useState(0)
 
-  function handleLogin(r: UserRole, email: string) {
-    setRole(r)
+  useEffect(() => {
+    getMe().then(data => {
+      if (data.success && data.email && data.role) {
+        setUserName(data.email)
+        setRole(data.role)
+        setPage(data.role)
+      }
+    }).finally(() => setChecking(false))
+  }, [])
+
+  function handleLogin(roles: UserRole[], email: string) {
     setUserName(email)
+    if (roles.length === 1) {
+      setRole(roles[0])
+      setPage(roles[0])
+    } else {
+      setPendingRoles(roles)
+      setPage('rolePicker')
+    }
+  }
+
+  function handleRoleSelected(r: UserRole) {
+    setRole(r)
+    setPendingRoles([])
     setPage(r)
   }
 
@@ -24,13 +53,39 @@ export default function App() {
     if (dest === 'home') setPage(role)
     else if (dest === 'account') setPage('account')
     else if (dest === 'createListing') setPage('createListing')
-    else if (dest === 'helpdesk') setPage('helpdesk')
+    else if (dest === 'helpdesk') setPage('submitTicket')
   }
 
-  function handleLogout() {
+  function handleBidNow(sellerEmail: string, listingId: number) {
+    setSelectedListing({ sellerEmail, listingId })
+    setPage('bidding')
+  }
+
+  async function handleLogout() {
+    await apiLogout()
     setPage('login')
     setUserName('')
+    setPendingRoles([])
   }
+
+  if (checking) return null
+
+  if (page === 'rolePicker') return (
+    <RolePickerPage
+      email={userName}
+      roles={pendingRoles}
+      onRoleSelected={handleRoleSelected}
+    />
+  )
+
+  if (page === 'bidding' && selectedListing) return (
+    <BiddingPage
+      sellerEmail={selectedListing.sellerEmail}
+      listingId={selectedListing.listingId}
+      userName={userName}
+      onBack={() => { setListingRefreshKey(k => k + 1); setPage(role) }}
+    />
+  )
 
   if (page === 'account') return (
     <AccountSettingsPage
@@ -53,6 +108,8 @@ export default function App() {
       role={role}
       onNavigate={handleNavigate}
       onLogout={handleLogout}
+      onBidNow={handleBidNow}
+      refreshKey={listingRefreshKey}
     />
   )
 
@@ -65,7 +122,19 @@ export default function App() {
     />
   )
 
-  if (page === 'helpdesk') return <HelpdeskLanding />
+  if (page === 'submitTicket') return (
+    <SubmitTicketPage
+      userName={userName}
+      onBack={() => setPage(role)}
+    />
+  )
+
+  if (page === 'helpdesk') return (
+    <HelpdeskLanding
+      userName={userName}
+      onLogout={handleLogout}
+    />
+  )
 
   return <LoginPage onLogin={handleLogin} />
 }

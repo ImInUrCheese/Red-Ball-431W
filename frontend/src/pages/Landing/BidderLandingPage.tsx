@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Header from './LandingPageHeader'
 import type { Notification } from './LandingPageHeader'
 import type { UserRole } from '../../api/auth'
-import { searchListings, getListingsByCategory, getTopLevelCategories } from '../../api/listings'
+import { searchListings, getListingsByCategory, getSubcategories } from '../../api/listings'
 import type { Listing } from '../../api/listings'
 import { getMyActiveBids } from '../../api/bids'
 import type { ActiveBid } from '../../api/bids'
@@ -15,6 +15,8 @@ interface BidderPageProps {
   role: UserRole
   onNavigate: (page: 'home' | 'account' | 'helpdesk') => void
   onLogout: () => void
+  onBidNow: (sellerEmail: string, listingId: number) => void
+  refreshKey: number
 }
 
 function apiNotifToHeader(n: ApiNotification): Notification {
@@ -26,15 +28,19 @@ function apiNotifToHeader(n: ApiNotification): Notification {
   }
 }
 
-export default function BidderPage({ userName, role, onNavigate, onLogout }: BidderPageProps) {
+export default function BidderPage({ userName, role, onNavigate, onLogout, onBidNow, refreshKey }: BidderPageProps) {
   const [search, setSearch]               = useState('')
-  const [activeCategory, setCategory]     = useState('All')
+  const [minPrice, setMinPrice]           = useState('')
+  const [maxPrice, setMaxPrice]           = useState('')
+  const [categoryPath, setCategoryPath]   = useState<string[]>(['All'])
+  const [subcategories, setSubcategories] = useState<string[]>([])
   const [listings, setListings]           = useState<Listing[]>([])
   const [myBids, setMyBids]               = useState<ActiveBid[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingListings, setLoadingListings] = useState(true)
-  const [categories, setCategories]       = useState<string[]>(['All'])
   const [currentPage, setCurrentPage]     = useState(1)
+
+  const currentCategory = categoryPath[categoryPath.length - 1]
 
   const LISTINGS_PER_PAGE = 25
   const totalPages = Math.ceil(listings.length / LISTINGS_PER_PAGE)
@@ -79,24 +85,27 @@ export default function BidderPage({ userName, role, onNavigate, onLogout }: Bid
     )
   }
 
-  // ── Fetch categories ────────────────────────────────────────
+  // ── Fetch subcategories when category changes ───────────────
   useEffect(() => {
-    getTopLevelCategories()
-      .then(data => setCategories(['All', ...data]))
-      .catch(err => console.error('Failed to load categories:', err))
-  }, [])
+    getSubcategories(currentCategory)
+      .then(setSubcategories)
+      .catch(() => setSubcategories([]))
+  }, [currentCategory])
 
   // ── Fetch listings ──────────────────────────────────────────
   const fetchListings = useCallback(async () => {
     setLoadingListings(true)
     try {
       let data: Listing[]
-      if (search.trim()) {
-        data = await searchListings(search.trim())
-      } else if (activeCategory === 'All') {
+      const min = minPrice !== '' ? parseFloat(minPrice) : undefined
+      const max = maxPrice !== '' ? parseFloat(maxPrice) : undefined
+      const hasFilters = search.trim() || min != null || max != null
+      if (hasFilters) {
+        data = await searchListings(search.trim() || undefined, min, max)
+      } else if (currentCategory === 'All') {
         data = await searchListings()
       } else {
-        data = await getListingsByCategory(activeCategory)
+        data = await getListingsByCategory(currentCategory)
       }
       setListings(data)
     } catch (err) {
@@ -104,7 +113,7 @@ export default function BidderPage({ userName, role, onNavigate, onLogout }: Bid
     } finally {
       setLoadingListings(false)
     }
-  }, [search, activeCategory])
+  }, [search, minPrice, maxPrice, currentCategory, refreshKey])
 
   useEffect(() => {
     const timer = setTimeout(fetchListings, 300)
@@ -135,6 +144,23 @@ export default function BidderPage({ userName, role, onNavigate, onLogout }: Bid
     }
   }
 
+  // ── Category navigation ─────────────────────────────────────
+  function drillInto(cat: string) {
+    setCategoryPath(prev => [...prev, cat])
+    setSearch('')
+    setMinPrice('')
+    setMaxPrice('')
+    setCurrentPage(1)
+  }
+
+  function navigateTo(index: number) {
+    setCategoryPath(prev => prev.slice(0, index + 1))
+    setSearch('')
+    setMinPrice('')
+    setMaxPrice('')
+    setCurrentPage(1)
+  }
+
   return (
     <div className="bidder-page">
       <Header
@@ -160,22 +186,62 @@ export default function BidderPage({ userName, role, onNavigate, onLogout }: Bid
             onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
           />
         </div>
+        <div className="price-range-wrap">
+          <input
+            className="price-input"
+            type="number"
+            min="0"
+            placeholder="Min $"
+            value={minPrice}
+            onChange={e => { setMinPrice(e.target.value); setCurrentPage(1) }}
+          />
+          <span className="price-sep">–</span>
+          <input
+            className="price-input"
+            type="number"
+            min="0"
+            placeholder="Max $"
+            value={maxPrice}
+            onChange={e => { setMaxPrice(e.target.value); setCurrentPage(1) }}
+          />
+        </div>
       </div>
 
-      {/* ── Category filter pills ── */}
-      <div className="category-bar">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            className={`cat-pill ${activeCategory === cat ? 'active' : ''}`}
-            onClick={() => { setCategory(cat); setSearch(''); setCurrentPage(1) }}
-          >
-            {cat}
-          </button>
-        ))}
-        <span className="listings-count">
-          {loadingListings ? 'Loading...' : `${listings.length} listing${listings.length !== 1 ? 's' : ''} found`}
-        </span>
+      {/* ── Category navigation ── */}
+      <div className="category-nav">
+        {/* Breadcrumb */}
+        <div className="cat-breadcrumb">
+          {categoryPath.map((cat, i) => (
+            <span key={i} className="cat-crumb-item">
+              {i > 0 && <span className="cat-crumb-sep">›</span>}
+              <button
+                className={`cat-crumb ${i === categoryPath.length - 1 ? 'current' : ''}`}
+                onClick={() => i < categoryPath.length - 1 ? navigateTo(i) : undefined}
+                disabled={i === categoryPath.length - 1}
+              >
+                {cat}
+              </button>
+            </span>
+          ))}
+          <span className="listings-count" style={{ marginLeft: 'auto' }}>
+            {loadingListings ? 'Loading...' : `${listings.length} listing${listings.length !== 1 ? 's' : ''} found`}
+          </span>
+        </div>
+
+        {/* Subcategory drill-down pills */}
+        {subcategories.length > 0 && (
+          <div className="subcat-pills">
+            {subcategories.map(cat => (
+              <button
+                key={cat}
+                className="cat-pill"
+                onClick={() => drillInto(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Two-column layout ── */}
@@ -205,7 +271,7 @@ export default function BidderPage({ userName, role, onNavigate, onLogout }: Bid
               <div className="listing-info">
                 <div className="listing-meta">
                   <span className="cat-tag">{listing.category}</span>
-                  <span className="listing-timer">🔨 {listing.bids_remaining ?? listing.max_bids} bids left</span>
+                  <span className="listing-timer"> {listing.bids_remaining ?? listing.max_bids} bids left</span>
                 </div>
                 <p className="listing-title">{listing.auction_title}</p>
                 <p className="listing-seller">Listed by <span>{listing.seller_email}</span></p>
@@ -214,14 +280,14 @@ export default function BidderPage({ userName, role, onNavigate, onLogout }: Bid
               <div className="listing-bid">
                 <p className="bid-label">Top Bid</p>
                 <p className="bid-amount">
-                  {listing.highest_bid != null ? `$${listing.highest_bid}` : `$${listing.reserve_price} reserve`}
+                  {listing.highest_bid != null ? `$${listing.highest_bid}` : '$0'}
                 </p>
                 <p className="bid-count">{listing.bid_count ?? 0} bids</p>
                 <button
                   className="bid-now-btn"
                   onClick={e => {
                     e.stopPropagation()
-                    // TODO: Navigate to bidding page
+                    onBidNow(listing.seller_email, listing.listing_id)
                   }}
                 >
                   Bid Now →
@@ -287,7 +353,7 @@ export default function BidderPage({ userName, role, onNavigate, onLogout }: Bid
                 </div>
 
                 {!bid.leading && (
-                  <button className="bid-again-btn">
+                  <button className="bid-again-btn" onClick={() => onBidNow(bid.seller_email, bid.listing_id)}>
                     Raise Bid →
                   </button>
                 )}

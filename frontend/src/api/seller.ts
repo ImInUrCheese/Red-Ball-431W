@@ -5,12 +5,26 @@ export interface ActiveListing {
   listing_id: number
   auction_title: string
   category: string
+  product_name: string
+  product_description: string
+  quantity: number
   reserve_price: number
   max_bids: number
   highest_bid: number | null
   bid_count: number
   bids_remaining: number
   image_url: string
+}
+
+export interface InactiveListing {
+  seller_email: string
+  listing_id: number
+  auction_title: string
+  category: string
+  product_name: string
+  reserve_price: number
+  max_bids: number
+  status: number
 }
 
 export interface SaleRecord {
@@ -28,4 +42,36 @@ export function getActiveListings(sellerEmail: string): Promise<ActiveListing[]>
 
 export function getSalesHistory(sellerEmail: string): Promise<SaleRecord[]> {
   return request<SaleRecord[]>(`/seller/${encodeURIComponent(sellerEmail)}/sales-history`)
+}
+
+export function getSellerAllListings(sellerEmail: string): Promise<{ active: InactiveListing[]; inactive: InactiveListing[]; sold: InactiveListing[] }> {
+  return request(`/listings/seller/${encodeURIComponent(sellerEmail)}`)
+}
+
+export interface UpdateListingPayload {
+  auction_title?: string
+  product_name?: string
+  product_description?: string
+  category?: string
+  quantity?: number
+  reserve_price?: number
+  max_bids?: number
+}
+
+export function updateListing(
+  sellerEmail: string,
+  listingId: number,
+  payload: UpdateListingPayload,
+): Promise<{ success: boolean; error?: string }> {
+  return request(`/listings/${encodeURIComponent(sellerEmail)}/${listingId}`, 'PATCH', payload)
+}
+
+export function deactivateListing(
+  sellerEmail: string,
+  listingId: number,
+  removalReason: string,
+): Promise<{ success: boolean; error?: string }> {
+  return request(`/listings/${encodeURIComponent(sellerEmail)}/${listingId}/deactivate`, 'POST', {
+    removal_reason: removalReason,
+  })
 }
