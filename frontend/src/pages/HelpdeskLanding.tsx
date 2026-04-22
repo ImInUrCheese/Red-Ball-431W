@@ -5,3 +5,4 @@ export default function HelpdeskLanding() {
     </div>
   )
 }
+//landing page for progress check

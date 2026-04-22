@@ -5,3 +5,4 @@ export default function BidderLanding() {
     </div>
   )
 }
+//this is old

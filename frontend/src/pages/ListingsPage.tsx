@@ -8,10 +8,12 @@ type Listing = {
 }
 
 export default function ListingsPage() {
+  //Track listings and the current fetch state.
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  //Load listings once when this page opens.
   useEffect(() => {
     async function fetchListings() {
       try {
@@ -26,6 +28,7 @@ export default function ListingsPage() {
       } catch {
         setError('Unable to load listings. Please try again later.')
       } finally {
+        //Either way, the first load has finished.
         setLoading(false)
       }
     }
@@ -47,14 +50,18 @@ export default function ListingsPage() {
           <p style={styles.subtitle}>Lion State University Marketplace</p>
         </section>
 
+        {/*Loading state*/}
         {loading && <p style={styles.message}>Loading listings...</p>}
 
+        {/*Error state*/}
         {error && !loading && <p style={styles.error}>{error}</p>}
 
+        {/*Empty state*/}
         {!loading && !error && listings.length === 0 && (
           <p style={styles.message}>No listings available.</p>
         )}
 
+        {/*Loaded listings*/}
         {!loading && !error && listings.length > 0 && (
           <div style={styles.grid}>
             {listings.map((listing) => (
