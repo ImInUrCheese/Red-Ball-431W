@@ -49,7 +49,7 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
     currentPage * LISTINGS_PER_PAGE
   )
 
-  // ── Pagination button helper ────────────────────────────────
+  //  result paging buttons 
   function renderPageButtons() {
     const delta = 2
     const left  = Math.max(1, currentPage - delta)
@@ -85,14 +85,14 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
     )
   }
 
-  // ── Fetch subcategories when category changes ───────────────
+  //  get subcategories  
   useEffect(() => {
     getSubcategories(currentCategory)
       .then(setSubcategories)
       .catch(() => setSubcategories([]))
   }, [currentCategory])
 
-  // ── Fetch listings ──────────────────────────────────────────
+  //  get listings 
   const fetchListings = useCallback(async () => {
     setLoadingListings(true)
     try {
@@ -120,21 +120,21 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
     return () => clearTimeout(timer)
   }, [fetchListings])
 
-  // ── Fetch my active bids ────────────────────────────────────
+  //  get my active bids 
   useEffect(() => {
     getMyActiveBids(userName)
       .then(setMyBids)
       .catch(err => console.error('Failed to load bids:', err))
   }, [userName])
 
-  // ── Fetch notifications ─────────────────────────────────────
+  //  get notifications 
   useEffect(() => {
     getNotifications(userName)
       .then(data => setNotifications(data.map(apiNotifToHeader)))
       .catch(err => console.error('Failed to load notifications:', err))
   }, [userName])
 
-  // ── Dismiss notification ────────────────────────────────────
+  //  dismis notification 
   async function dismissNotification(id: string) {
     try {
       await markNotificationRead(Number(id))
@@ -144,7 +144,7 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
     }
   }
 
-  // ── Category navigation ─────────────────────────────────────
+  //  category navigation 
   function drillInto(cat: string) {
     setCategoryPath(prev => [...prev, cat])
     setSearch('')
@@ -172,7 +172,7 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
         onLogout={onLogout}
       />
 
-      {/* ── Search bar ── */}
+
       <div className="bidder-toolbar">
         <div className="search-wrap">
           <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -207,9 +207,7 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
         </div>
       </div>
 
-      {/* ── Category navigation ── */}
       <div className="category-nav">
-        {/* Breadcrumb */}
         <div className="cat-breadcrumb">
           {categoryPath.map((cat, i) => (
             <span key={i} className="cat-crumb-item">
@@ -228,7 +226,6 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
           </span>
         </div>
 
-        {/* Subcategory drill-down pills */}
         {subcategories.length > 0 && (
           <div className="subcat-pills">
             {subcategories.map(cat => (
@@ -244,10 +241,8 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
         )}
       </div>
 
-      {/* ── Two-column layout ── */}
       <div className="bidder-content">
 
-        {/* ── Left: Listings ── */}
         <main className="listings-col">
           {!loadingListings && listings.length === 0 && (
             <div className="empty-state">No listings match your search.</div>
@@ -319,7 +314,6 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
           )}
         </main>
 
-        {/* ── Right: My Active Bids ── */}
         <aside className="my-bids-col">
           <h2 className="section-heading">My Active Bids</h2>
 
