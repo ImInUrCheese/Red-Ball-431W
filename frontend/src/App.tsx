@@ -22,6 +22,7 @@ export default function App() {
   const [selectedListing, setSelectedListing] = useState<{ sellerEmail: string; listingId: number } | null>(null)
   const [listingRefreshKey, setListingRefreshKey] = useState(0)
 
+  // On start check if the user has an active session and skip the login 
   useEffect(() => {
     getMe().then(data => {
       if (data.success && data.email && data.role) {
@@ -32,6 +33,8 @@ export default function App() {
     }).finally(() => setChecking(false))
   }, [])
 
+
+  // handels the login 
   function handleLogin(roles: UserRole[], email: string) {
     setUserName(email)
     if (roles.length === 1) {
@@ -43,6 +46,7 @@ export default function App() {
     }
   }
 
+  // select landing page
   function handleRoleSelected(r: UserRole) {
     setRole(r)
     setPendingRoles([])
@@ -56,11 +60,13 @@ export default function App() {
     else if (dest === 'helpdesk') setPage('submitTicket')
   }
 
+  // handels bid now
   function handleBidNow(sellerEmail: string, listingId: number) {
     setSelectedListing({ sellerEmail, listingId })
     setPage('bidding')
   }
 
+  // handels logout 
   async function handleLogout() {
     await apiLogout()
     setPage('login')
