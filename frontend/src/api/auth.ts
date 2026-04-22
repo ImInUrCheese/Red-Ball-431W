@@ -72,5 +72,9 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...rest, email: rest.email.trim().toLowerCase(), password_hash }),
   })
-  return res.json()
+  try {
+    return await res.json()
+  } catch {
+    return { success: false, error: `Server error (HTTP ${res.status})` }
+  }
 }

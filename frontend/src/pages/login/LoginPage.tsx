@@ -70,20 +70,24 @@ export default function LoginPage({ onLogin }: { onLogin: (roles: UserRole[], em
       return
     }
 
-    const data = await register({
-      role: regRole,
-      email: regEmail,
-      password: regPassword,
-      ...(regRole === 'bidder' && { first_name: firstName, last_name: lastName, age: parseInt(age, 10), major: major || undefined }),
-      ...(regRole === 'seller' && { bank_routing_number: routingNum, bank_account_number: accountNum }),
-      ...(regRole === 'helpdesk' && { position }),
-    })
+    try {
+      const data = await register({
+        role: regRole,
+        email: regEmail,
+        password: regPassword,
+        ...(regRole === 'bidder' && { first_name: firstName, last_name: lastName, age: parseInt(age, 10), major: major || undefined }),
+        ...(regRole === 'seller' && { bank_routing_number: routingNum, bank_account_number: accountNum }),
+        ...(regRole === 'helpdesk' && { position }),
+      })
 
-    if (data.success && data.role) {
-      showToast('Account created! Redirecting…', true)
-      setTimeout(() => onLogin([data.role!], regEmail.trim().toLowerCase()), 1200)
-    } else {
-      showToast(data.error || 'Registration failed.', false)
+      if (data.success && data.role) {
+        showToast('Account created! Please sign in.', true)
+        setTimeout(() => setTab('signin'), 1500)
+      } else {
+        showToast(data.error || 'Registration failed.', false)
+      }
+    } catch {
+      showToast('Registration failed. Please check your connection and try again.', false)
     }
   }
 

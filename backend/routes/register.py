@@ -6,7 +6,11 @@ register_bp = Blueprint('register', __name__)
 
 @register_bp.route('/register', methods=['POST'])
 def register():
-    data = request.get_json()
+    try:
+        data = request.get_json(force=True) or {}
+    except Exception:
+        return jsonify({'success': False, 'error': 'Invalid request body'}), 400
+
     role = data.get('role', '').strip().lower()
     email = data.get('email', '').strip().lower()
     password_hash = data.get('password_hash', '')

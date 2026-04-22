@@ -19,7 +19,10 @@ def get_subcategories(parent_category: str) -> list:
 
 
 def get_leaf_categories() -> list:
-    parent_names = db.session.query(Categories.parent_category).distinct().subquery()
+    parent_names = (db.session.query(Categories.parent_category)
+                   .filter(Categories.parent_category.isnot(None))
+                   .distinct()
+                   .subquery())
     leaves = (Categories.query
               .filter(~Categories.category_name.in_(parent_names))
               .order_by(Categories.category_name)
@@ -247,10 +250,6 @@ def search_listings(keyword: str = None, min_price: float = None,
                 AuctionListings.seller_email.ilike(pattern),
             )
         )
-    if min_price is not None:
-        query = query.filter(AuctionListings.reserve_price >= min_price)
-    if max_price is not None:
-        query = query.filter(AuctionListings.reserve_price <= max_price)
 
     from services.bid_service import get_listing_bids
     result = []
@@ -259,6 +258,13 @@ def search_listings(keyword: str = None, min_price: float = None,
         bid_info = get_listing_bids(l.seller_email, l.listing_id)
         if bid_info:
             s.update(bid_info)
+
+        effective_price = s.get('highest_bid') or 0
+        if min_price is not None and effective_price < min_price:
+            continue
+        if max_price is not None and effective_price > max_price:
+            continue
+
         result.append(s)
     return result
 
