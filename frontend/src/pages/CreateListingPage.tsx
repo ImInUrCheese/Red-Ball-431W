@@ -53,7 +53,7 @@ export default function CreateListingPage({ userName, onBack }: CreateListingPro
       .catch(() => setCategories([]))
   }, [])
 
-  const reviewRows = useMemo(
+  const reviewRows = useMemo( //handles different fields in listing pages
     () => [
       ['Auction Title', form.auctionTitle || 'Not provided'],
       ['Product Name', form.productName || 'Not provided'],
@@ -71,7 +71,7 @@ export default function CreateListingPage({ userName, onBack }: CreateListingPro
     setStatus('')
   }
 
-  function getStepError() {
+  function getStepError() { //this function errors out whenever a required field is missing for each step
     if (currentStep === 1) {
       if (!form.auctionTitle.trim()) return 'Auction title is required.'
       if (!form.productName.trim()) return 'Product name is required.'

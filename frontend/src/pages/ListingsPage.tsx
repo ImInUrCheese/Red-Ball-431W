@@ -125,6 +125,7 @@ function normalizeListing(listing: ApiListing): Listing {
 }
 
 export default function ListingsPage() {
+  //Track listings and the current fetch state.
   const [listings, setListings] = useState<Listing[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
@@ -144,6 +145,7 @@ export default function ListingsPage() {
       } catch {
         setError('Unable to load listings. Please try again later.')
       } finally {
+        //Either way, the first load has finished.
         setLoading(false)
       }
     }
@@ -202,8 +204,10 @@ export default function ListingsPage() {
           ))}
         </section>
 
+        {/*Loading state*/}
         {loading && <p style={styles.message}>Loading listings...</p>}
 
+        {/*Error state*/}
         {error && !loading && <p style={styles.error}>{error}</p>}
 
         {!loading && !error && filteredListings.length === 0 && (
