@@ -9,6 +9,9 @@ import type { PaymentInfo } from '../api/user'
 import { confirmPayment, getListingTransaction } from '../api/transactions'
 import { checkCanRate, submitRating } from '../api/ratings'
 
+// page shows the item, letting users bid, handlw when the auction ends , payment and rating
+
+
 interface BiddingPageProps {
   sellerEmail: string
   listingId: number
@@ -16,7 +19,9 @@ interface BiddingPageProps {
   onBack: () => void
 }
 
+
 export default function BiddingPage({ sellerEmail, listingId, userName, onBack }: BiddingPageProps) {
+  // main listing + bid data from backend
   const [listing, setListing] = useState<(Listing & { highest_bid: number | null; bid_count: number; bids_remaining: number }) | null>(null)
   const [bidHistory, setBidHistory] = useState<BidEntry[]>([])
   const [bidAmount, setBidAmount] = useState('')
