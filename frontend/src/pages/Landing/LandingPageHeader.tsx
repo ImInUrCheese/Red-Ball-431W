@@ -96,7 +96,6 @@ export default function Header({
                 ) : (
                   notifications.map(n => (
                     <div key={n.id} className={`notif-item ${n.seen ? 'seen' : ''}`}>
-                      <span className="notif-icon">{n.won ? '🏆' : '📉'}</span>
                       <span className="notif-msg">{n.message}</span>
                       {!n.seen && onDismissNotification && (
                         <button className="notif-mark" onClick={() => onDismissNotification(n.id)}>✕</button>
