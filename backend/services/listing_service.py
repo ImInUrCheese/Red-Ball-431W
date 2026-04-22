@@ -1,31 +1,48 @@
 from database import db
-from model.listings import Categories, AuctionListings, ListingRemovals, Bids
+from model.listings import Categories, AuctionListings, ListingRemovals, Bids, Transactions
 from services.image_service import save_image, get_image_url
 from sqlalchemy import or_
 
-
-# ---------------------------------------------------------------------------
 # Category hierarchy
-# ---------------------------------------------------------------------------
 
 def get_subcategories(parent_category: str) -> list:
+    # 'Root' is an internal seeder node; treat 'All' and 'Root' as equivalent
+    effective = 'Root' if parent_category == 'All' else parent_category
     cats = (Categories.query
-            .filter_by(parent_category=parent_category)
+            .filter_by(parent_category=effective)
             .order_by(Categories.category_name)
             .all())
     return [c.category_name for c in cats]
 
 
+def get_leaf_categories() -> list:
+    parent_names = (db.session.query(Categories.parent_category)
+                   .filter(Categories.parent_category.isnot(None))
+                   .distinct()
+                   .subquery())
+    leaves = (Categories.query
+              .filter(~Categories.category_name.in_(parent_names))
+              .order_by(Categories.category_name)
+              .all())
+    return [c.category_name for c in leaves]
+
+
 def get_listings_by_category(category_name: str) -> list:
+    from services.bid_service import get_listing_bids
     listings = (AuctionListings.query
                 .filter_by(category=category_name, status=1)
                 .all())
-    return [_serialize_listing(l) for l in listings]
+    result = []
+    for l in listings:
+        s = _serialize_listing(l)
+        bid_info = get_listing_bids(l.seller_email, l.listing_id)
+        if bid_info:
+            s.update(bid_info)
+        result.append(s)
+    return result
 
 
-# ---------------------------------------------------------------------------
 # Listing detail
-# ---------------------------------------------------------------------------
 
 def get_listing_detail(seller_email: str, listing_id: int) -> dict | None:
     listing = db.session.get(AuctionListings, (seller_email, listing_id))
@@ -45,9 +62,7 @@ def get_listing_detail(seller_email: str, listing_id: int) -> dict | None:
     }
 
 
-# ---------------------------------------------------------------------------
 # Seller listing management
-# ---------------------------------------------------------------------------
 
 def get_seller_listings(seller_email: str) -> dict:
     listings = AuctionListings.query.filter_by(seller_email=seller_email).all()
@@ -131,10 +146,7 @@ def deactivate_listing(seller_email: str, listing_id: int,
     db.session.commit()
     return {'success': True}
 
-
-# ---------------------------------------------------------------------------
 # Image upload
-# ---------------------------------------------------------------------------
 
 def upload_listing_image(seller_email: str, listing_id: int, file) -> dict:
     """Save an uploaded listing image and store its filename on the AuctionListings row.
@@ -157,9 +169,58 @@ def upload_listing_image(seller_email: str, listing_id: int, file) -> dict:
     return {'success': True, 'image_url': get_image_url(listing.image_filename)}
 
 
-# ---------------------------------------------------------------------------
+def get_seller_active_listings(seller_email: str) -> list:
+    listings = (AuctionListings.query
+                .filter_by(seller_email=seller_email, status=1)
+                .all())
+    result = []
+    for l in listings:
+        bids = (Bids.query
+                .filter_by(seller_email=seller_email, listing_id=l.listing_id)
+                .order_by(Bids.bid_price.desc())
+                .all())
+        bid_count = len(bids)
+        highest_bid = bids[0].bid_price if bids else None
+        result.append({
+            **_serialize_listing(l),
+            'highest_bid': highest_bid,
+            'bid_count': bid_count,
+            'bids_remaining': l.max_bids - bid_count,
+        })
+    return result
+
+
+def get_seller_sales_history(seller_email: str) -> list:
+    listings = (AuctionListings.query
+                .filter_by(seller_email=seller_email)
+                .filter(AuctionListings.status.in_([0, 2]))
+                .all())
+    result = []
+    for l in listings:
+        if l.status == 2:
+            transaction = (Transactions.query
+                           .filter_by(seller_email=seller_email, listing_id=l.listing_id)
+                           .first())
+            result.append({
+                'listing_id': l.listing_id,
+                'auction_title': l.auction_title,
+                'category': l.category,
+                'final_payment': transaction.payment if transaction else None,
+                'date': transaction.date.isoformat() if transaction else None,
+                'status': 'sold',
+            })
+        else:
+            result.append({
+                'listing_id': l.listing_id,
+                'auction_title': l.auction_title,
+                'category': l.category,
+                'final_payment': None,
+                'date': None,
+                'status': 'unsold',
+            })
+    return result
+
 # Search
-# ---------------------------------------------------------------------------
 
 def search_listings(keyword: str = None, min_price: float = None,
                     max_price: float = None) -> list:
@@ -176,17 +237,25 @@ def search_listings(keyword: str = None, min_price: float = None,
                 AuctionListings.seller_email.ilike(pattern),
             )
         )
-    if min_price is not None:
-        query = query.filter(AuctionListings.reserve_price >= min_price)
-    if max_price is not None:
-        query = query.filter(AuctionListings.reserve_price <= max_price)
 
-    return [_serialize_listing(l) for l in query.all()]
+    from services.bid_service import get_listing_bids
+    result = []
+    for l in query.all():
+        s = _serialize_listing(l)
+        bid_info = get_listing_bids(l.seller_email, l.listing_id)
+        if bid_info:
+            s.update(bid_info)
 
+        effective_price = s.get('highest_bid') or 0
+        if min_price is not None and effective_price < min_price:
+            continue
+        if max_price is not None and effective_price > max_price:
+            continue
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+        result.append(s)
+    return result
+
+# Serializer
 
 def _serialize_listing(l: AuctionListings) -> dict:
     return {

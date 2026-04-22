@@ -50,9 +50,6 @@ def seed(table, data, size):
 
 
 def _add_column_if_missing(table: str, column: str, definition: str):
-    """Add a column to an existing table if it does not already exist.
-    Uses INFORMATION_SCHEMA so it is safe to call on every startup.
-    """
     exists = db.session.execute(db.text(
         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
         "WHERE TABLE_SCHEMA = DATABASE() "
@@ -130,7 +127,7 @@ def init_db():
         raw = parse("testdb/Categories.csv")
         csv_names = set(raw['category_name'])
         csv_parents = set(p for p in raw['parent_category'] if p is not None)
-        # Categories that appear only as parents in the CSV have no row of their own —
+        # Categories that appear only as parents in the CSV have no row of their own
         # they are top-level and should sit directly under the 'All' root.
         top_level = csv_parents - csv_names
 

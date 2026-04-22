@@ -1,15 +1,14 @@
-import {useEffect, useMemo, useState} from 'react'
-import type {CSSProperties} from 'react'
-import {getProfile, getPaymentInfo, updateProfile, changePassword} from '../api/user'
+import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { getProfile, getPaymentInfo, updateProfile, changePassword } from '../api/user'
 
 type SettingsTab = 'profile' | 'payment' | 'sellerInfo' | 'password'
 
-//this defines the settings tabs for each role
-const allTabs: {id: SettingsTab; icon: string; label: string; roles: string[]}[] = [
-  {id: 'profile', icon: 'P', label: 'Profile', roles: ['bidder', 'seller', 'helpdesk']},
-  {id: 'payment', icon: '$', label: 'Payment', roles: ['bidder']},
-  {id: 'sellerInfo', icon: 'S', label: 'Seller Info', roles: ['seller']},
-  {id: 'password', icon: '*', label: 'Password', roles: ['bidder', 'seller', 'helpdesk']},
+const allTabs: { id: SettingsTab; icon: string; label: string; roles: string[] }[] = [
+  { id: 'profile',    icon: 'P', label: 'Profile',     roles: ['bidder', 'seller', 'helpdesk'] },
+  { id: 'payment',    icon: '$', label: 'Payment',     roles: ['bidder'] },
+  { id: 'sellerInfo', icon: 'S', label: 'Seller Info', roles: ['seller'] },
+  { id: 'password',   icon: '*', label: 'Password',    roles: ['bidder', 'seller', 'helpdesk'] },
 ]
 
 interface AccountSettingsProps {
@@ -18,9 +17,9 @@ interface AccountSettingsProps {
   onBack: () => void
 }
 
-type StatusState = {msg: string; ok: boolean} | null
+type StatusState = { msg: string; ok: boolean } | null
 
-function Field({label, children}: {label: string; children: React.ReactNode}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={s.field}>
       <label style={s.label}>{label}</label>
@@ -29,28 +28,28 @@ function Field({label, children}: {label: string; children: React.ReactNode}) {
   )
 }
 
-export default function AccountSettingsPage({userName, role, onBack}: AccountSettingsProps) {
+export default function AccountSettingsPage({ userName, role, onBack }: AccountSettingsProps) {
   const tabs = allTabs.filter(t => t.roles.includes(role))
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
 
   // Profile state
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [age, setAge] = useState('')
-  const [major, setMajor] = useState('')
-  const [routing, setRouting] = useState('')
-  const [account, setAccount] = useState('')
+  const [firstName, setFirstName]   = useState('')
+  const [lastName, setLastName]     = useState('')
+  const [age, setAge]               = useState('')
+  const [major, setMajor]           = useState('')
+  const [routing, setRouting]       = useState('')
+  const [account, setAccount]       = useState('')
   const [profileStatus, setProfileStatus] = useState<StatusState>(null)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]         = useState(false)
 
   // Payment (read-only)
-  const [payment, setPayment] = useState<{card_type: string; last_four: string; expire_month: number; expire_year: number} | null>(null)
+  const [payment, setPayment] = useState<{ card_type: string; last_four: string; expire_month: number; expire_year: number } | null>(null)
 
   // Password state
-  const [newPassword, setNewPassword] = useState('')
+  const [newPassword, setNewPassword]         = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [pwStatus, setPwStatus] = useState<StatusState>(null)
-  const [savingPw, setSavingPw] = useState(false)
+  const [pwStatus, setPwStatus]               = useState<StatusState>(null)
+  const [savingPw, setSavingPw]               = useState(false)
 
   useEffect(() => {
     getProfile().then(p => {
@@ -69,13 +68,8 @@ export default function AccountSettingsPage({userName, role, onBack}: AccountSet
 
   const fullName = [firstName, lastName].filter(Boolean).join(' ')
   const initials = useMemo(
-    () =>
-      [form.firstName, form.lastName]
-        .filter(Boolean)
-        .map((part) => part[0]?.toUpperCase())
-        .join('')
-        .slice(0, 2) || 'U',
-    [form.firstName, form.lastName],
+    () => [firstName, lastName].filter(Boolean).map(p => p[0].toUpperCase()).join('').slice(0, 2) || 'U',
+    [firstName, lastName],
   )
 
   async function handleSaveProfile() {
@@ -83,12 +77,12 @@ export default function AccountSettingsPage({userName, role, onBack}: AccountSet
     setProfileStatus(null)
     try {
       const payload = role === 'bidder'
-        ? {first_name: firstName, last_name: lastName, age: age ? parseInt(age, 10) : undefined, major: major || undefined}
-        : {bank_routing_number: routing || undefined, bank_account_number: account || undefined}
+        ? { first_name: firstName, last_name: lastName, age: age ? parseInt(age, 10) : undefined, major: major || undefined }
+        : { bank_routing_number: routing || undefined, bank_account_number: account || undefined }
       const res = await updateProfile(payload)
-      setProfileStatus({msg: res.success ? 'Profile saved.' : (res.error ?? 'Failed to save.'), ok: res.success})
+      setProfileStatus({ msg: res.success ? 'Profile saved.' : (res.error ?? 'Failed to save.'), ok: res.success })
     } catch {
-      setProfileStatus({msg: 'Failed to save.', ok: false })
+      setProfileStatus({ msg: 'Failed to save.', ok: false })
     } finally {
       setSaving(false)
     }
@@ -96,62 +90,64 @@ export default function AccountSettingsPage({userName, role, onBack}: AccountSet
 
   async function handleChangePassword() {
     if (!newPassword || !confirmPassword) {
-      setPwStatus({msg: 'Both fields are required.', ok: false })
+      setPwStatus({ msg: 'Both fields are required.', ok: false })
       return
     }
     if (newPassword !== confirmPassword) {
-      setPwStatus({msg: 'Passwords do not match.', ok: false })
+      setPwStatus({ msg: 'Passwords do not match.', ok: false })
       return
     }
     if (newPassword.length < 6) {
-      setPwStatus({msg: 'Password must be at least 6 characters.', ok: false })
+      setPwStatus({ msg: 'Password must be at least 6 characters.', ok: false })
       return
     }
     setSavingPw(true)
     setPwStatus(null)
     try {
       const res = await changePassword(newPassword)
-      setPwStatus({msg: res.success ? 'Password updated.' : (res.error ?? 'Failed to update.'), ok: res.success })
-      if (res.success) {setNewPassword(''); setConfirmPassword('') }
+      setPwStatus({ msg: res.success ? 'Password updated.' : (res.error ?? 'Failed to update.'), ok: res.success })
+      if (res.success) { setNewPassword(''); setConfirmPassword('') }
     } catch {
-      setPwStatus({msg: 'Failed to update.', ok: false })
+      setPwStatus({ msg: 'Failed to update.', ok: false })
     } finally {
       setSavingPw(false)
     }
   }
 
   return (
-    <div style={styles.page}>
-      <main style={styles.main}>
-        <header style={styles.profileHeader}>
-          <div style={styles.avatar}>{initials}</div>
-          <div style={styles.profileTitleBlock}>
-            <p style={styles.eyebrow}>Account Settings</p>
-            <h1 style={styles.name}>{fullName || 'Your Account'}</h1>
-            <p style={styles.emailLine}>{form.email} - Bidder and Seller</p>
+    <div style={s.page}>
+      <main style={s.main}>
+        <header style={s.profileHeader}>
+          <button type="button" style={s.backButton} onClick={onBack}>← Back</button>
+          <div style={s.avatar}>{initials}</div>
+          <div style={s.profileTitleBlock}>
+            <p style={s.eyebrow}>Account Settings</p>
+            <h1 style={s.name}>{fullName || userName}</h1>
+            <p style={s.emailLine}>{userName} · {role}</p>
           </div>
         </header>
 
-        <div style={styles.content}>
-          <aside style={styles.sidebar} aria-label="Account settings">
-            {tabs.map((tab) => {
+        <div style={s.content}>
+          <aside style={s.sidebar}>
+            {tabs.map(tab => {
               const isActive = tab.id === activeTab
-
               return (
                 <button
                   key={tab.id}
                   type="button"
-                  style={{...s.tabButton, ...(isActive ? s.tabButtonActive : {}) }}
-                  onClick={() => {setActiveTab(tab.id); setProfileStatus(null); setPwStatus(null) }}
+                  style={{ ...s.tabButton, ...(isActive ? s.tabButtonActive : {}) }}
+                  onClick={() => { setActiveTab(tab.id); setProfileStatus(null); setPwStatus(null) }}
                 >
-                  <span style={{...s.tabIcon, ...(isActive ? s.tabIconActive : {}) }}>{tab.icon}</span>
+                  <span style={{ ...s.tabIcon, ...(isActive ? s.tabIconActive : {}) }}>{tab.icon}</span>
                   {tab.label}
                 </button>
               )
             })}
           </aside>
 
-          <form style={styles.card} onSubmit={handleSubmit}>
+          <div style={s.card}>
+
+            {/* ── Profile tab ── */}
             {activeTab === 'profile' && (
               <section style={s.section}>
                 <h2 style={s.sectionTitle}>Personal Information</h2>
@@ -189,7 +185,7 @@ export default function AccountSettingsPage({userName, role, onBack}: AccountSet
 
                 {role !== 'helpdesk' && (
                   <div style={s.actions}>
-                    <button style={{...s.saveButton, opacity: saving ? 0.6 : 1 }} onClick={handleSaveProfile} disabled={saving}>
+                    <button style={{ ...s.saveButton, opacity: saving ? 0.6 : 1 }} onClick={handleSaveProfile} disabled={saving}>
                       {saving ? 'Saving…' : 'Save Changes'}
                     </button>
                   </div>
@@ -197,6 +193,7 @@ export default function AccountSettingsPage({userName, role, onBack}: AccountSet
               </section>
             )}
 
+            {/* ── Payment tab (read-only) ── */}
             {activeTab === 'payment' && (
               <section style={s.section}>
                 <h2 style={s.sectionTitle}>Payment Method</h2>
@@ -237,13 +234,14 @@ export default function AccountSettingsPage({userName, role, onBack}: AccountSet
                   <p style={profileStatus.ok ? s.successText : s.errorText}>{profileStatus.msg}</p>
                 )}
                 <div style={s.actions}>
-                  <button style={{...s.saveButton, opacity: saving ? 0.6 : 1 }} onClick={handleSaveProfile} disabled={saving}>
+                  <button style={{ ...s.saveButton, opacity: saving ? 0.6 : 1 }} onClick={handleSaveProfile} disabled={saving}>
                     {saving ? 'Saving…' : 'Save Changes'}
                   </button>
                 </div>
               </section>
             )}
 
+            {/* ── Password tab ── */}
             {activeTab === 'password' && (
               <section style={s.section}>
                 <h2 style={s.sectionTitle}>Change Password</h2>
@@ -258,7 +256,7 @@ export default function AccountSettingsPage({userName, role, onBack}: AccountSet
                   <p style={pwStatus.ok ? s.successText : s.errorText}>{pwStatus.msg}</p>
                 )}
                 <div style={s.actions}>
-                  <button style={{...s.saveButton, opacity: savingPw ? 0.6 : 1 }} onClick={handleChangePassword} disabled={savingPw}>
+                  <button style={{ ...s.saveButton, opacity: savingPw ? 0.6 : 1 }} onClick={handleChangePassword} disabled={savingPw}>
                     {savingPw ? 'Updating…' : 'Update Password'}
                   </button>
                 </div>
@@ -271,7 +269,7 @@ export default function AccountSettingsPage({userName, role, onBack}: AccountSet
   )
 }
 
-const styles: Record<string, CSSProperties> = {
+const s: Record<string, CSSProperties> = {
   page: {
     minHeight: '100vh',
     background: '#0b1521',
@@ -290,6 +288,16 @@ const styles: Record<string, CSSProperties> = {
     gap: '16px',
     marginBottom: '22px',
   },
+  backButton: {
+    padding: '6px 12px',
+    background: 'transparent',
+    color: '#7dbde8',
+    border: '1px solid #36516d',
+    borderRadius: '6px',
+    font: '700 13px Inter, "Segoe UI", system-ui, sans-serif',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+  },
   avatar: {
     width: '64px',
     height: '64px',
@@ -303,7 +311,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '20px',
     fontWeight: 900,
   },
-  profileTitleBlock: {minWidth: 0 },
+  profileTitleBlock: { minWidth: 0 },
   eyebrow: {
     margin: '0 0 6px',
     color: '#5ba4d4',
@@ -318,7 +326,6 @@ const styles: Record<string, CSSProperties> = {
     fontFamily: 'Georgia, "Times New Roman", serif',
     fontSize: '34px',
     fontWeight: 500,
-    letterSpacing: 0,
     lineHeight: 1.05,
   },
   emailLine: {
@@ -376,57 +383,38 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px',
     fontWeight: 900,
   },
-  tabIconActive: {background: '#5ba4d4', color: '#0b1521' },
+  tabIconActive: { background: '#5ba4d4', color: '#0b1521' },
   card: {
-    minHeight: '510px',
+    minHeight: '400px',
     padding: '22px',
     background: '#152438',
     border: '1px solid #293d56',
     borderRadius: '8px',
-    boxShadow: '0 16px 40px rgba(0, 0, 0, .22)',
+    boxShadow: '0 16px 40px rgba(0,0,0,.22)',
   },
-  section: {
-    margin: 0,
-  },
-  sectionDivider: {
-    marginTop: '20px',
-    paddingTop: '20px',
-    borderTop: '1px solid #293d56',
-  },
-  section: {margin: 0 },
+  section: { margin: 0 },
   sectionTitle: {
     margin: '0 0 18px',
     color: '#edf3f8',
     fontSize: '18px',
     fontWeight: 800,
-    letterSpacing: 0,
+  },
+  fieldRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '14px',
   },
   field: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '7px',
+    gap: '6px',
     marginBottom: '16px',
-  },
-  fieldRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '14px',
-  },
-  addressGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: '14px',
-  },
-  locationGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-    gap: '14px',
   },
   label: {
     color: '#9db0c2',
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 800,
-    letterSpacing: '.05em',
+    letterSpacing: '.07em',
     textTransform: 'uppercase',
   },
   input: {
@@ -441,9 +429,16 @@ const styles: Record<string, CSSProperties> = {
     font: '600 14px Inter, "Segoe UI", system-ui, sans-serif',
     outline: 'none',
   },
-  readOnlyInput: {
-    color: '#8fa5ba',
-    cursor: 'not-allowed',
+  readonlyValue: {
+    color: '#edf3f8',
+    fontSize: '15px',
+    fontWeight: 600,
+  },
+  hint: {
+    color: '#4a607a',
+    fontSize: '12px',
+    fontWeight: 500,
+    marginTop: '2px',
   },
   paymentPreview: {
     minHeight: '88px',
@@ -459,24 +454,19 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     fontWeight: 800,
   },
-  callout: {
-    marginBottom: '18px',
-    padding: '14px',
-    background: '#102033',
-    border: '1px solid #293d56',
-    borderRadius: '6px',
-    color: '#9db0c2',
+  muted: {
+    color: '#4a607a',
     fontSize: '14px',
-    fontWeight: 600,
-    lineHeight: 1.5,
+    fontStyle: 'italic',
+    margin: 0,
   },
   actions: {
     display: 'flex',
     justifyContent: 'flex-end',
-    marginTop: '18px',
+    marginTop: '8px',
   },
   saveButton: {
-    minWidth: '132px',
+    minWidth: '140px',
     minHeight: '44px',
     padding: '10px 18px',
     background: '#5ba4d4',
@@ -486,20 +476,19 @@ const styles: Record<string, CSSProperties> = {
     font: '900 14px Inter, "Segoe UI", system-ui, sans-serif',
     cursor: 'pointer',
   },
-  errorText: {
-    margin: '10px 0 0',
-    color: '#ff8c8c',
-    fontSize: '13px',
-    fontWeight: 800,
-    lineHeight: 1.35,
-  },
   successText: {
-    margin: '10px 0 0',
-    padding: '12px',
+    margin: '0 0 12px',
+    padding: '10px 12px',
     background: '#12324a',
     border: '1px solid #2d6a9f',
     borderRadius: '6px',
     color: '#7dbde8',
+    fontSize: '13px',
+    fontWeight: 800,
+  },
+  errorText: {
+    margin: '0 0 12px',
+    color: '#ff8c8c',
     fontSize: '13px',
     fontWeight: 800,
   },

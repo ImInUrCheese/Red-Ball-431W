@@ -5,7 +5,7 @@ from services.notification_service import create_notification
 
 def place_bid(bidder_email: str, seller_email: str,
               listing_id: int, bid_price: float) -> dict:
-    listing = db.session.get(AuctionListings, (seller_email, listing_id))
+    listing = db.session.get(AuctionListings, (seller_email, listing_id))7
     if not listing:
         return {'success': False, 'error': 'Listing not found'}
     if listing.status != 1:
@@ -59,6 +59,57 @@ def place_bid(bidder_email: str, seller_email: str,
         'auction_complete': new_bid_count >= listing.max_bids,
     }
 
+def get_bids_by_bidder(bidder_email: str) -> list:
+    bids = (Bids.query
+            .filter_by(bidder_email=bidder_email)
+            .order_by(Bids.bid_price.desc())
+            .all())
+
+    seen = {}
+    for bid in bids:
+        key = (bid.seller_email, bid.listing_id)
+        if key not in seen:
+            seen[key] = bid
+
+    result = []
+    for (seller_email, listing_id), bid in seen.items():
+        listing = db.session.get(AuctionListings, (seller_email, listing_id))
+        if not listing or listing.status != 1:
+            continue  # skip inactive/sold auctions
+
+        all_bids = (Bids.query
+                    .filter_by(seller_email=seller_email, listing_id=listing_id)
+                    .order_by(Bids.bid_price.desc())
+                    .all())
+
+        highest_bid = all_bids[0].bid_price if all_bids else 0
+        bid_count = len(all_bids)
+        bids_remaining = listing.max_bids - bid_count
+        leading = all_bids[0].bidder_email == bidder_email if all_bids else False
+
+        result.append({
+            'seller_email': seller_email,
+            'listing_id': listing_id,
+            'auction_title': listing.auction_title,
+            'your_bid': bid.bid_price,
+            'highest_bid': highest_bid,
+            'bids_remaining': bids_remaining,
+            'leading': leading,
+        })
+
+    return result
+
+
+def get_bid_history(seller_email: str, listing_id: int) -> list | None:
+    listing = db.session.get(AuctionListings, (seller_email, listing_id))
+    if not listing:
+        return None
+    bids = (Bids.query
+            .filter_by(seller_email=seller_email, listing_id=listing_id)
+            .order_by(Bids.bid_price.desc())
+            .all())
+    return [{'bidder_email': b.bidder_email, 'bid_price': b.bid_price} for b in bids]
+
 
 def get_listing_bids(seller_email: str, listing_id: int) -> dict:
     listing = db.session.get(AuctionListings, (seller_email, listing_id))
@@ -97,10 +148,7 @@ def check_auction_complete(seller_email: str, listing_id: int) -> dict:
         'highest_bid': bids[0].bid_price if bids else None,
     }
 
-
-# ---------------------------------------------------------------------------
-# Internal — called when max_bids is reached after a bid is placed
-# ---------------------------------------------------------------------------
+# Internal called when max_bids is reached after a bid is placed
 
 def _close_auction(listing: AuctionListings, all_bids: list):
     all_bids_sorted = sorted(all_bids, key=lambda b: b.bid_price, reverse=True)

@@ -1,75 +1,90 @@
 from database import db
 from model.users import Users, Bidders, Sellers, Helpdesk
+from model.address import CreditCards
 from services.image_service import save_image, get_image_url
 
 
 def authenticate(email: str, password_hash: str) -> dict:
     user = db.session.get(Users, email)
     if user and user.password == password_hash:
-        role = _get_role(email)
-        return {'success': True, 'role': role}
+        roles = get_roles(email)
+        return {'success': True, 'roles': roles}
     return {'success': False, 'error': 'Invalid email or password'}
 
 
-def _get_role(email: str) -> str:
-    if db.session.get(Bidders, email):
-        return 'bidder'
-    if db.session.get(Sellers, email):
-        return 'seller'
+def get_roles(email: str) -> list:
+    roles = []
     if db.session.get(Helpdesk, email):
-        return 'helpdesk'
-    return 'unknown'
+        roles.append('helpdesk')
+    if db.session.get(Sellers, email):
+        roles.append('seller')
+    if db.session.get(Bidders, email):
+        roles.append('bidder')
+    return roles
 
-
-# ---------------------------------------------------------------------------
 # Registration
-# ---------------------------------------------------------------------------
 
 def register_bidder(email: str, password_hash: str, first_name: str,
                     last_name: str, age: int, major: str = None,
                     home_address_id: str = None) -> dict:
     if db.session.get(Users, email):
         return {'success': False, 'error': 'Email already registered'}
-    db.session.add(Users(email=email, password=password_hash))
-    db.session.add(Bidders(
-        email=email,
-        first_name=first_name,
-        last_name=last_name,
-        age=age,
-        major=major,
-        home_address_id=home_address_id,
-    ))
-    db.session.commit()
-    return {'success': True}
+    try:
+        user = Users(email=email, password=password_hash)
+        db.session.add(user)
+        db.session.flush()  # ensure Users row exists before Bidders FK resolves
+        db.session.add(Bidders(
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            age=age,
+            major=major,
+            home_address_id=home_address_id,
+        ))
+        db.session.commit()
+        return {'success': True}
+    except Exception as e:
+        db.session.rollback()
+        return {'success': False, 'error': str(e)}
 
 
 def register_seller(email: str, password_hash: str, bank_routing_number: str,
                     bank_account_number: str) -> dict:
     if db.session.get(Users, email):
         return {'success': False, 'error': 'Email already registered'}
-    db.session.add(Users(email=email, password=password_hash))
-    db.session.add(Sellers(
-        email=email,
-        bank_routing_number=bank_routing_number,
-        bank_account_number=bank_account_number,
-        balance=0.0,
-    ))
-    db.session.commit()
-    return {'success': True}
+    try:
+        user = Users(email=email, password=password_hash)
+        db.session.add(user)
+        db.session.flush()
+        db.session.add(Sellers(
+            email=email,
+            bank_routing_number=bank_routing_number,
+            bank_account_number=bank_account_number,
+            balance=0.0,
+        ))
+        db.session.commit()
+        return {'success': True}
+    except Exception as e:
+        db.session.rollback()
+        return {'success': False, 'error': str(e)}
 
 
 def register_helpdesk(email: str, password_hash: str, position: str) -> dict:
     if db.session.get(Users, email):
         return {'success': False, 'error': 'Email already registered'}
-    db.session.add(Users(email=email, password=password_hash))
-    db.session.add(Helpdesk(email=email, position=position))
-    db.session.commit()
-    return {'success': True}
+    try:
+        user = Users(email=email, password=password_hash)
+        db.session.add(user)
+        db.session.flush()
+        db.session.add(Helpdesk(email=email, position=position))
+        db.session.commit()
+        return {'success': True}
+    except Exception as e:
+        db.session.rollback()
+        return {'success': False, 'error': str(e)}
 
 
-# ---------------------------------------------------------------------------
 # Profile reads
-# ---------------------------------------------------------------------------
 
 def get_bidder_profile(email: str) -> dict | None:
     bidder = db.session.get(Bidders, email)
@@ -113,9 +128,18 @@ def get_helpdesk_profile(email: str) -> dict | None:
     }
 
 
-# ---------------------------------------------------------------------------
+def get_payment_info(email: str) -> dict | None:
+    card = CreditCards.query.filter_by(owner_email=email).first()
+    if not card:
+        return None
+    return {
+        'card_type':     card.card_type.strip(),
+        'last_four':     card.credit_card_num.replace('-', '')[-4:],
+        'expire_month':  card.expire_month,
+        'expire_year':   card.expire_year,
+    }
+
 # Profile updates
-# ---------------------------------------------------------------------------
 
 def update_bidder_profile(email: str, first_name: str = None, last_name: str = None,
                           age: int = None, major: str = None,

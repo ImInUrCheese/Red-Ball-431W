@@ -1,8 +1,21 @@
 :root {
+  /* ── App-wide dark theme tokens ── */
+  --bg-deep:    #0d1522;
+  --bg-mid:     #101d2d;
+  --bg-card:    #152438;
+  --bg-input:   #20334b;
+  --text-white: #e8edf4;
+  --text-muted: #9db0c2;
+  --text-dim:   #7a8fa8;
+  --gold:       #5ba4d4;
+  --gold-light: #7dbde8;
+  --gold-muted: #2a3d58;
+  --border:     #293d56;
+
+  /* ── Legacy tokens (login page / vite defaults) ── */
   --text: #6b6375;
   --text-h: #08060d;
   --bg: #fff;
-  --border: #e5e4e7;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
   --accent-bg: rgba(170, 59, 255, 0.1);

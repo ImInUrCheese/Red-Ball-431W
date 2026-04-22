@@ -37,6 +37,11 @@ def record_transaction(seller_email: str, listing_id: int,
     return {'success': True, 'transaction_id': transaction.transaction_id}
 
 
+def get_listing_transaction(seller_email: str, listing_id: int) -> dict | None:
+    t = Transactions.query.filter_by(seller_email=seller_email, listing_id=listing_id).first()
+    return _serialize(t) if t else None
+
+
 def get_buyer_transactions(buyer_email: str) -> list:
     transactions = (Transactions.query
                     .filter_by(buyer_email=buyer_email)

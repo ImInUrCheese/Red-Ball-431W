@@ -1,123 +1,140 @@
-import { useState } from 'react'
-import type { CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
+import { getMe, logout as apiLogout } from './api/auth'
 import type { UserRole } from './api/auth'
 import AccountSettingsPage from './pages/AccountSettingsPage'
-import BidderLanding from './pages/BidderLanding'
+import BiddingPage from './pages/BiddingPage'
 import CreateListingPage from './pages/CreateListingPage'
 import HelpdeskLanding from './pages/HelpdeskLanding'
+import SubmitTicketPage from './pages/SubmitTicketPage'
+import RolePickerPage from './pages/login/RolePickerPage'
+import BidderLandingPage from './pages/Landing/BidderLandingPage'
+import SellerLandingPage from './pages/Landing/SellerLandingPage'
 import LoginPage from './pages/login/LoginPage'
-import SellerLanding from './pages/SellerLanding'
 
-type DemoPage = 'createListing' | 'accountSettings'
-type Page = 'login' | UserRole | DemoPage
-
-const demoPages: { id: DemoPage; label: string; hash: string }[] = [
-  { id: 'createListing', label: 'Create Listing', hash: '#create-listing' },
-  { id: 'accountSettings', label: 'Account Settings', hash: '#account-settings' },
-]
-
-function getInitialPage(): Page {
-  if (window.location.hash === '#create-listing') return 'createListing'
-  if (window.location.hash === '#account-settings') return 'accountSettings'
-  return 'login'
-}
+type Page = 'login' | 'rolePicker' | UserRole | 'account' | 'createListing' | 'bidding' | 'submitTicket'
 
 export default function App() {
-  const [page, setPage] = useState<Page>(getInitialPage)
+  const [page, setPage] = useState<Page>('login')
+  const [userName, setUserName] = useState('')
+  const [role, setRole] = useState<UserRole>('bidder')
+  const [pendingRoles, setPendingRoles] = useState<UserRole[]>([])
+  const [checking, setChecking] = useState(true)
+  const [selectedListing, setSelectedListing] = useState<{ sellerEmail: string; listingId: number } | null>(null)
+  const [listingRefreshKey, setListingRefreshKey] = useState(0)
 
-  function openPage(nextPage: Page, hash = '') {
-    window.history.replaceState(null, '', hash || window.location.pathname)
-    setPage(nextPage)
+  useEffect(() => {
+    getMe().then(data => {
+      if (data.success && data.email && data.role) {
+        setUserName(data.email)
+        setRole(data.role)
+        setPage(data.role)
+      }
+    }).finally(() => setChecking(false))
+  }, [])
+
+  function handleLogin(roles: UserRole[], email: string) {
+    setUserName(email)
+    if (roles.length === 1) {
+      setRole(roles[0])
+      setPage(roles[0])
+    } else {
+      setPendingRoles(roles)
+      setPage('rolePicker')
+    }
   }
 
-  if (page === 'bidder') return <BidderLanding />
-  if (page === 'seller') return <SellerLanding />
-  if (page === 'helpdesk') return <HelpdeskLanding />
-
-  if (page === 'createListing' || page === 'accountSettings') {
-    return (
-      <div style={styles.shell}>
-        <nav style={styles.nav}>
-          <button
-            type="button"
-            style={styles.loginButton}
-            onClick={() => openPage('login')}
-          >
-            Back to Login
-          </button>
-
-          <div style={styles.switcher} aria-label="Demo pages">
-            {demoPages.map((demoPage) => (
-              <button
-                key={demoPage.id}
-                type="button"
-                style={{
-                  ...styles.switchButton,
-                  ...(page === demoPage.id ? styles.switchButtonActive : {}),
-                }}
-                onClick={() => openPage(demoPage.id, demoPage.hash)}
-              >
-                {demoPage.label}
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        {page === 'createListing' && <CreateListingPage />}
-        {page === 'accountSettings' && <AccountSettingsPage />}
-      </div>
-    )
+  function handleRoleSelected(r: UserRole) {
+    setRole(r)
+    setPendingRoles([])
+    setPage(r)
   }
 
-  return <LoginPage onLogin={(role) => openPage(role)} />
-}
+  function handleNavigate(dest: 'home' | 'account' | 'helpdesk' | 'createListing') {
+    if (dest === 'home') setPage(role)
+    else if (dest === 'account') setPage('account')
+    else if (dest === 'createListing') setPage('createListing')
+    else if (dest === 'helpdesk') setPage('submitTicket')
+  }
 
-const styles: Record<string, CSSProperties> = {
-  shell: {
-    minHeight: '100vh',
-    background: '#0b1521',
-  },
-  nav: {
-    minHeight: '62px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '16px',
-    padding: '10px 24px',
-    background: '#101d2d',
-    borderBottom: '1px solid #293d56',
-    boxSizing: 'border-box',
-  },
-  loginButton: {
-    minHeight: '36px',
-    padding: '8px 12px',
-    background: 'transparent',
-    color: '#edf3f8',
-    border: '1px solid #36516d',
-    borderRadius: '6px',
-    font: '800 13px Inter, "Segoe UI", system-ui, sans-serif',
-    cursor: 'pointer',
-  },
-  switcher: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-  },
-  switchButton: {
-    minHeight: '36px',
-    padding: '8px 12px',
-    background: '#20334b',
-    color: '#9db0c2',
-    border: '1px solid #36516d',
-    borderRadius: '6px',
-    font: '800 13px Inter, "Segoe UI", system-ui, sans-serif',
-    cursor: 'pointer',
-  },
-  switchButtonActive: {
-    background: '#5ba4d4',
-    borderColor: '#5ba4d4',
-    color: '#0b1521',
-  },
+  function handleBidNow(sellerEmail: string, listingId: number) {
+    setSelectedListing({ sellerEmail, listingId })
+    setPage('bidding')
+  }
+
+  async function handleLogout() {
+    await apiLogout()
+    setPage('login')
+    setUserName('')
+    setPendingRoles([])
+  }
+
+  if (checking) return null
+
+  if (page === 'rolePicker') return (
+    <RolePickerPage
+      email={userName}
+      roles={pendingRoles}
+      onRoleSelected={handleRoleSelected}
+    />
+  )
+
+  if (page === 'bidding' && selectedListing) return (
+    <BiddingPage
+      sellerEmail={selectedListing.sellerEmail}
+      listingId={selectedListing.listingId}
+      userName={userName}
+      onBack={() => { setListingRefreshKey(k => k + 1); setPage(role) }}
+    />
+  )
+
+  if (page === 'account') return (
+    <AccountSettingsPage
+      userName={userName}
+      role={role}
+      onBack={() => setPage(role)}
+    />
+  )
+
+  if (page === 'createListing') return (
+    <CreateListingPage
+      userName={userName}
+      onBack={() => setPage(role)}
+    />
+  )
+
+  if (page === 'bidder') return (
+    <BidderLandingPage
+      userName={userName}
+      role={role}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+      onBidNow={handleBidNow}
+      refreshKey={listingRefreshKey}
+    />
+  )
+
+  if (page === 'seller') return (
+    <SellerLandingPage
+      userName={userName}
+      role={role}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+    />
+  )
+
+  if (page === 'submitTicket') return (
+    <SubmitTicketPage
+      userName={userName}
+      onBack={() => setPage(role)}
+    />
+  )
+
+  if (page === 'helpdesk') return (
+    <HelpdeskLanding
+      userName={userName}
+      onLogout={handleLogout}
+    />
+  )
+
+  return <LoginPage onLogin={handleLogin} />
 }
