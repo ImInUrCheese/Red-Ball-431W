@@ -43,20 +43,20 @@ interface EditForm {
 }
 
 export default function SellerPage({ userName, role, onNavigate, onLogout }: SellerPageProps) {
-  const [notifications, setNotifications]   = useState<Notification[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [activeListings, setActiveListings] = useState<ActiveListing[]>([])
   const [inactiveListings, setInactiveListings] = useState<InactiveListing[]>([])
-  const [salesHistory, setSalesHistory]     = useState<SaleRecord[]>([])
-  const [averageRating, setAverageRating]   = useState<number | null>(null)
+  const [salesHistory, setSalesHistory] = useState<SaleRecord[]>([])
+  const [averageRating, setAverageRating] = useState<number | null>(null)
 
   // Inline action state
-  const [editingKey, setEditingKey]         = useState<ActionKey | null>(null)
-  const [editForm, setEditForm]             = useState<EditForm | null>(null)
-  const [editStatus, setEditStatus]         = useState('')
+  const [editingKey, setEditingKey] = useState<ActionKey | null>(null)
+  const [editForm, setEditForm] = useState<EditForm | null>(null)
+  const [editStatus, setEditStatus] = useState('')
   const [deactivatingKey, setDeactivatingKey] = useState<ActionKey | null>(null)
   const [deactivateReason, setDeactivateReason] = useState('')
   const [deactivateStatus, setDeactivateStatus] = useState('')
-  const [saving, setSaving]                 = useState(false)
+  const [saving, setSaving] = useState(false)
 
   function actionKey(sellerEmail: string, listingId: number): ActionKey {
     return `${sellerEmail}-${listingId}`
@@ -101,13 +101,13 @@ export default function SellerPage({ userName, role, onNavigate, onLogout }: Sel
     setEditingKey(key)
     setEditStatus('')
     setEditForm({
-      auction_title:       listing.auction_title,
-      product_name:        listing.product_name,
+      auction_title: listing.auction_title,
+      product_name: listing.product_name,
       product_description: listing.product_description ?? '',
-      category:            listing.category,
-      quantity:            String(listing.max_bids),   // use actual quantity when available
-      reserve_price:       String(listing.reserve_price),
-      max_bids:            String(listing.max_bids),
+      category: listing.category,
+      quantity: String(listing.max_bids),   // use actual quantity when available
+      reserve_price: String(listing.reserve_price),
+      max_bids: String(listing.max_bids),
     })
   }
 
@@ -125,12 +125,12 @@ export default function SellerPage({ userName, role, onNavigate, onLogout }: Sel
     setSaving(true)
     setEditStatus('')
     const res = await updateListing(listing.seller_email, listing.listing_id, {
-      auction_title:       editForm.auction_title,
-      product_name:        editForm.product_name,
+      auction_title: editForm.auction_title,
+      product_name: editForm.product_name,
       product_description: editForm.product_description,
-      category:            editForm.category,
-      reserve_price:       parseFloat(editForm.reserve_price),
-      max_bids:            parseInt(editForm.max_bids, 10),
+      category: editForm.category,
+      reserve_price: parseFloat(editForm.reserve_price),
+      max_bids: parseInt(editForm.max_bids, 10),
     })
     setSaving(false)
     if (res.success) {
@@ -162,8 +162,8 @@ export default function SellerPage({ userName, role, onNavigate, onLogout }: Sel
 
   function renderStars(avg: number | null) {
     if (avg === null) return <span className="stars">No ratings yet</span>
-    const full  = Math.floor(avg)
-    const half  = avg - full >= 0.5 ? 1 : 0
+    const full = Math.floor(avg)
+    const half = avg - full >= 0.5 ? 1 : 0
     const empty = 5 - full - half
     return (
       <span className="stars">
@@ -205,7 +205,7 @@ export default function SellerPage({ userName, role, onNavigate, onLogout }: Sel
       <div className="seller-content">
         <div className="listings-col">
 
-          {/* ── Active Listings ── */}
+
           <div>
             <h2 className="section-heading">Active Listings</h2>
             <div className="table-wrap">
@@ -264,7 +264,6 @@ export default function SellerPage({ userName, role, onNavigate, onLogout }: Sel
                           </td>
                         </tr>
 
-                        {/* ── Inline edit panel ── */}
                         {isEditing && editForm && (
                           <tr key={`${key}-edit`}>
                             <td colSpan={7} style={{ padding: 0 }}>
@@ -310,7 +309,6 @@ export default function SellerPage({ userName, role, onNavigate, onLogout }: Sel
                           </tr>
                         )}
 
-                        {/* ── Inline deactivate panel ── */}
                         {isDeactivating && (
                           <tr key={`${key}-deactivate`}>
                             <td colSpan={7} style={{ padding: 0 }}>
@@ -344,7 +342,6 @@ export default function SellerPage({ userName, role, onNavigate, onLogout }: Sel
             </div>
           </div>
 
-          {/* ── Inactive Listings ── */}
           <div>
             <h2 className="section-heading">Inactive Listings</h2>
             <div className="table-wrap">
@@ -374,7 +371,6 @@ export default function SellerPage({ userName, role, onNavigate, onLogout }: Sel
             </div>
           </div>
 
-          {/* ── Sales History ── */}
           <div>
             <h2 className="section-heading">Sales History</h2>
             <div className="table-wrap">

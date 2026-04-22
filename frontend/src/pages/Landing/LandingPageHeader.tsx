@@ -3,7 +3,7 @@ import type { UserRole } from '../../api/auth'
 import { getProfile } from '../../api/user'
 import './LandingPageHeader.css'
 
-// ── Types ────────────────────────────────────────────────────
+//  Types 
 
 export interface Notification {
   id: string
@@ -21,7 +21,7 @@ interface HeaderProps {
   onLogout: () => void
 }
 
-// ── Component ────────────────────────────────────────────────
+//  Components
 
 export default function Header({
   userName,
@@ -57,23 +57,21 @@ export default function Header({
   return (
     <header className="site-header">
 
-      {/* Left — logo */}
+
       <div className="header-left">
         <button className="header-logo" onClick={() => onNavigate('home')}>
           <span>Nittany</span>Auction
         </button>
       </div>
 
-      {/* Center — name + role */}
+
       <div className="header-center">
         <span className="header-username">{displayName}</span>
         <span className="header-role-badge">{role}</span>
       </div>
 
-      {/* Right — actions */}
       <div className="header-right">
 
-        {/* Notification bell — bidders & sellers only */}
         {role !== 'helpdesk' && (
           <div className="bell-wrap" ref={bellRef}>
             <button
@@ -96,6 +94,7 @@ export default function Header({
                 ) : (
                   notifications.map(n => (
                     <div key={n.id} className={`notif-item ${n.seen ? 'seen' : ''}`}>
+                      <span className="notif-icon">{n.won ? '🏆' : '📉'}</span>
                       <span className="notif-msg">{n.message}</span>
                       {!n.seen && onDismissNotification && (
                         <button className="notif-mark" onClick={() => onDismissNotification(n.id)}>✕</button>
@@ -108,7 +107,7 @@ export default function Header({
           </div>
         )}
 
-        {/* HelpDesk Request */}
+
         {role !== 'helpdesk' && (
           <button className="header-action-btn" onClick={() => onNavigate('helpdesk')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -120,11 +119,6 @@ export default function Header({
           </button>
         )}
 
-        {/* Account Settings */}
-        {/* TODO: Navigate to AccountSettingsPage
-            When implemented: onNavigate('account') should route to AccountSettingsPage
-            which handles profile, payment info (bidders), and banking info (sellers)
-        */}
         <button className="header-action-btn" onClick={() => onNavigate('account')}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="8" r="4"/>
@@ -133,7 +127,6 @@ export default function Header({
           <span>Account</span>
         </button>
 
-        {/* Logout */}
         <button className="header-action-btn header-logout" onClick={onLogout}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
