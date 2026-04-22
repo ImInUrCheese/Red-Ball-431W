@@ -29,16 +29,16 @@ function apiNotifToHeader(n: ApiNotification): Notification {
 }
 
 export default function BidderPage({ userName, role, onNavigate, onLogout, onBidNow, refreshKey }: BidderPageProps) {
-  const [search, setSearch]               = useState('')
-  const [minPrice, setMinPrice]           = useState('')
-  const [maxPrice, setMaxPrice]           = useState('')
-  const [categoryPath, setCategoryPath]   = useState<string[]>(['All'])
+  const [search, setSearch] = useState('')
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
+  const [categoryPath, setCategoryPath] = useState<string[]>(['All'])
   const [subcategories, setSubcategories] = useState<string[]>([])
-  const [listings, setListings]           = useState<Listing[]>([])
-  const [myBids, setMyBids]               = useState<ActiveBid[]>([])
+  const [listings, setListings] = useState<Listing[]>([])
+  const [myBids, setMyBids] = useState<ActiveBid[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingListings, setLoadingListings] = useState(true)
-  const [currentPage, setCurrentPage]     = useState(1)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const currentCategory = categoryPath[categoryPath.length - 1]
 
@@ -348,7 +348,7 @@ export default function BidderPage({ userName, role, onNavigate, onLogout, onBid
 
                 {!bid.leading && (
                   <button className="bid-again-btn" onClick={() => onBidNow(bid.seller_email, bid.listing_id)}>
-                    Raise Bid →
+                    Raise Bid 
                   </button>
                 )}
               </div>

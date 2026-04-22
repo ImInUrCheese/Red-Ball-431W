@@ -7,7 +7,6 @@
   flex-direction: column;
 }
 
-/* ── Seller hero strip ── */
 .seller-hero {
   display: flex;
   align-items: center;
@@ -50,7 +49,8 @@
 }
 .list-item-btn:hover { background: var(--gold-light); transform: translateY(-1px); }
 
-/* ── Main two-column layout ── */
+
+
 .seller-content {
   display: grid;
   grid-template-columns: 1fr 300px;
@@ -60,17 +60,16 @@
   flex: 1;
 }
 
-/* ── Section headings ── */
+
 .section-heading {
   font-family: 'Playfair Display', serif;
   font-size: 1.05rem; font-weight: 700;
   margin: 0 0 .9rem; color: var(--text-white);
 }
 
-/* ── Left col ── */
 .listings-col { display: flex; flex-direction: column; gap: 1.8rem; }
 
-/* ── Shared table styles ── */
+
 .table-wrap {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -108,7 +107,7 @@
 .td-amount { color: var(--gold); font-weight: 600; font-family: 'Playfair Display', serif; font-size: .95rem; }
 .td-empty { text-align: center; color: var(--text-dim); padding: 1.5rem; font-size: .88rem; }
 
-/* Questions badge on listing row */
+
 .q-badge {
   display: inline-flex; align-items: center; gap: .3rem;
   font-size: .72rem; font-weight: 600;
@@ -117,7 +116,6 @@
   margin-left: .5rem;
 }
 
-/* Status pills */
 .status-pill {
   font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   border-radius: 4px; padding: 2px 8px; white-space: nowrap;
@@ -126,7 +124,8 @@
 .status-pending { background: rgba(242,153,74,.12);  color: #f2994a; border: 1px solid rgba(242,153,74,.3); }
 .status-unsold  { background: rgba(235,87,87,.12);   color: #eb5757; border: 1px solid rgba(235,87,87,.3); }
 
-/* ── Right col: pending questions ── */
+
+
 .questions-col { position: sticky; top: 78px; }
 
 .q-card {
@@ -179,7 +178,7 @@
   font-size: .88rem;
 }
 
-/* ── Action buttons (edit / deactivate) ── */
+
 .action-btn {
   padding: .35rem .75rem;
   border: none; border-radius: 6px;
@@ -203,7 +202,7 @@
 }
 .action-btn-deactivate:hover:not(:disabled) { background: rgba(235,87,87,.22); }
 
-/* ── Inline panels ── */
+
 .inline-panel {
   background: var(--bg-input);
   border-top: 1px solid var(--border);
@@ -293,7 +292,7 @@
   margin-top: .75rem;
 }
 
-/* ── Responsive ── */
+
 @media (max-width: 900px) {
   .seller-content { grid-template-columns: 1fr; }
   .questions-col { position: static; }
