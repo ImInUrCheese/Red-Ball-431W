@@ -1,67 +1,73 @@
-import { useMemo, useState } from 'react'
-import type { CSSProperties, FormEvent } from 'react'
+import {useEffect, useMemo, useState} from 'react'
+import type {CSSProperties} from 'react'
+import {getProfile, getPaymentInfo, updateProfile, changePassword} from '../api/user'
 
-type AccountForm = {
-  firstName: string
-  lastName: string
-  email: string
-  phone: string
-  streetNumber: string
-  streetName: string
-  city: string
-  state: string
-  zipCode: string
-  major: string
-  age: string
-  cardType: string
-  cardLastFour: string
-  expireMonth: string
-  expireYear: string
-  bankRoutingNumber: string
-  bankAccountNumber: string
-  currentPassword: string
-  newPassword: string
-  confirmPassword: string
-}
+type SettingsTab = 'profile' | 'payment' | 'sellerInfo' | 'password'
 
-type SettingsTab = 'profile' | 'payment' | 'password' | 'sellerInfo'
-
-const tabs: { id: SettingsTab; icon: string; label: string }[] = [
-  { id: 'profile', icon: 'P', label: 'Profile' },
-  { id: 'payment', icon: '$', label: 'Payment' },
-  { id: 'password', icon: '*', label: 'Password' },
-  { id: 'sellerInfo', icon: 'S', label: 'Seller Info' },
+//this defines the settings tabs for each role
+const allTabs: {id: SettingsTab; icon: string; label: string; roles: string[]}[] = [
+  {id: 'profile', icon: 'P', label: 'Profile', roles: ['bidder', 'seller', 'helpdesk']},
+  {id: 'payment', icon: '$', label: 'Payment', roles: ['bidder']},
+  {id: 'sellerInfo', icon: 'S', label: 'Seller Info', roles: ['seller']},
+  {id: 'password', icon: '*', label: 'Password', roles: ['bidder', 'seller', 'helpdesk']},
 ]
 
-const initialForm: AccountForm = {
-  firstName: 'Alex',
-  lastName: 'Smith',
-  email: 'alex.smith@lsu.edu',
-  phone: '(814) 555-0192',
-  streetNumber: '173',
-  streetName: 'College Ave',
-  city: 'State College',
-  state: 'PA',
-  zipCode: '16801',
-  major: 'Computer Science',
-  age: '21',
-  cardType: 'Visa',
-  cardLastFour: '4242',
-  expireMonth: '05',
-  expireYear: '2028',
-  bankRoutingNumber: '021000021',
-  bankAccountNumber: '000123456789',
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: '',
+interface AccountSettingsProps {
+  userName: string
+  role: 'bidder' | 'seller' | 'helpdesk'
+  onBack: () => void
 }
 
-export default function AccountSettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
-  const [status, setStatus] = useState('')
-  const [form, setForm] = useState<AccountForm>(initialForm)
+type StatusState = {msg: string; ok: boolean} | null
 
-  const fullName = `${form.firstName} ${form.lastName}`.trim()
+function Field({label, children}: {label: string; children: React.ReactNode}) {
+  return (
+    <div style={s.field}>
+      <label style={s.label}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+export default function AccountSettingsPage({userName, role, onBack}: AccountSettingsProps) {
+  const tabs = allTabs.filter(t => t.roles.includes(role))
+  const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
+
+  // Profile state
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [age, setAge] = useState('')
+  const [major, setMajor] = useState('')
+  const [routing, setRouting] = useState('')
+  const [account, setAccount] = useState('')
+  const [profileStatus, setProfileStatus] = useState<StatusState>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Payment (read-only)
+  const [payment, setPayment] = useState<{card_type: string; last_four: string; expire_month: number; expire_year: number} | null>(null)
+
+  // Password state
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwStatus, setPwStatus] = useState<StatusState>(null)
+  const [savingPw, setSavingPw] = useState(false)
+
+  useEffect(() => {
+    getProfile().then(p => {
+      setFirstName(p.first_name ?? '')
+      setLastName(p.last_name ?? '')
+      setAge(p.age != null ? String(p.age) : '')
+      setMajor(p.major ?? '')
+      setRouting(p.bank_routing_number ?? '')
+      setAccount(p.bank_account_number ?? '')
+    }).catch(() => {})
+
+    if (role === 'bidder') {
+      getPaymentInfo().then(setPayment).catch(() => {})
+    }
+  }, [userName, role])
+
+  const fullName = [firstName, lastName].filter(Boolean).join(' ')
   const initials = useMemo(
     () =>
       [form.firstName, form.lastName]
@@ -72,57 +78,46 @@ export default function AccountSettingsPage() {
     [form.firstName, form.lastName],
   )
 
-  function updateField(field: keyof AccountForm, value: string) {
-    setForm((current) => ({ ...current, [field]: value }))
-    setStatus('')
+  async function handleSaveProfile() {
+    setSaving(true)
+    setProfileStatus(null)
+    try {
+      const payload = role === 'bidder'
+        ? {first_name: firstName, last_name: lastName, age: age ? parseInt(age, 10) : undefined, major: major || undefined}
+        : {bank_routing_number: routing || undefined, bank_account_number: account || undefined}
+      const res = await updateProfile(payload)
+      setProfileStatus({msg: res.success ? 'Profile saved.' : (res.error ?? 'Failed to save.'), ok: res.success})
+    } catch {
+      setProfileStatus({msg: 'Failed to save.', ok: false })
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function validateActiveTab() {
-    if (activeTab === 'profile') {
-      if (!form.firstName.trim() || !form.lastName.trim()) return 'First and last name are required.'
-      if (!Number.isInteger(Number(form.age)) || Number(form.age) < 18) {
-        return 'Age must be a whole number of at least 18.'
-      }
-      if (!form.zipCode.trim()) return 'Zip code is required.'
-    }
-
-    if (activeTab === 'payment') {
-      if (form.cardLastFour && !/^\d{4}$/.test(form.cardLastFour)) {
-        return 'Card last four must be exactly 4 digits.'
-      }
-      if (form.expireMonth && (Number(form.expireMonth) < 1 || Number(form.expireMonth) > 12)) {
-        return 'Expiration month must be between 1 and 12.'
-      }
-    }
-
-    if (activeTab === 'password') {
-      if (!form.currentPassword || !form.newPassword || !form.confirmPassword) {
-        return 'Fill out all password fields before saving.'
-      }
-      if (form.newPassword.length < 8) return 'New password must be at least 8 characters.'
-      if (form.newPassword !== form.confirmPassword) return 'New passwords do not match.'
-    }
-
-    if (activeTab === 'sellerInfo') {
-      if (!/^\d{9}$/.test(form.bankRoutingNumber)) return 'Routing number must be 9 digits.'
-      if (!/^\d{4,17}$/.test(form.bankAccountNumber)) {
-        return 'Account number must be 4 to 17 digits.'
-      }
-    }
-
-    return ''
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const error = validateActiveTab()
-
-    if (error) {
-      setStatus(error)
+  async function handleChangePassword() {
+    if (!newPassword || !confirmPassword) {
+      setPwStatus({msg: 'Both fields are required.', ok: false })
       return
     }
-
-    setStatus(`${tabs.find((tab) => tab.id === activeTab)?.label} changes saved locally.`)
+    if (newPassword !== confirmPassword) {
+      setPwStatus({msg: 'Passwords do not match.', ok: false })
+      return
+    }
+    if (newPassword.length < 6) {
+      setPwStatus({msg: 'Password must be at least 6 characters.', ok: false })
+      return
+    }
+    setSavingPw(true)
+    setPwStatus(null)
+    try {
+      const res = await changePassword(newPassword)
+      setPwStatus({msg: res.success ? 'Password updated.' : (res.error ?? 'Failed to update.'), ok: res.success })
+      if (res.success) {setNewPassword(''); setConfirmPassword('') }
+    } catch {
+      setPwStatus({msg: 'Failed to update.', ok: false })
+    } finally {
+      setSavingPw(false)
+    }
   }
 
   return (
@@ -146,18 +141,10 @@ export default function AccountSettingsPage() {
                 <button
                   key={tab.id}
                   type="button"
-                  style={{
-                    ...styles.tabButton,
-                    ...(isActive ? styles.tabButtonActive : {}),
-                  }}
-                  onClick={() => {
-                    setStatus('')
-                    setActiveTab(tab.id)
-                  }}
+                  style={{...s.tabButton, ...(isActive ? s.tabButtonActive : {}) }}
+                  onClick={() => {setActiveTab(tab.id); setProfileStatus(null); setPwStatus(null) }}
                 >
-                  <span style={{ ...styles.tabIcon, ...(isActive ? styles.tabIconActive : {}) }}>
-                    {tab.icon}
-                  </span>
+                  <span style={{...s.tabIcon, ...(isActive ? s.tabIconActive : {}) }}>{tab.icon}</span>
                   {tab.label}
                 </button>
               )
@@ -166,255 +153,118 @@ export default function AccountSettingsPage() {
 
           <form style={styles.card} onSubmit={handleSubmit}>
             {activeTab === 'profile' && (
-              <>
-                <section style={styles.section}>
-                  <h2 style={styles.sectionTitle}>Personal Information</h2>
-                  <div style={styles.fieldRow}>
-                    <label style={styles.field}>
-                      <span style={styles.label}>First Name</span>
-                      <input
-                        style={styles.input}
-                        value={form.firstName}
-                        onChange={(event) => updateField('firstName', event.target.value)}
-                      />
-                    </label>
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>Personal Information</h2>
 
-                    <label style={styles.field}>
-                      <span style={styles.label}>Last Name</span>
-                      <input
-                        style={styles.input}
-                        value={form.lastName}
-                        onChange={(event) => updateField('lastName', event.target.value)}
-                      />
-                    </label>
+                {/* Email — always read-only */}
+                <Field label="Email Address">
+                  <span style={s.readonlyValue}>{userName}</span>
+                  <span style={s.hint}>Email can only be changed via a helpdesk request.</span>
+                </Field>
+
+                {role === 'bidder' && (
+                  <>
+                    <div style={s.fieldRow}>
+                      <Field label="First Name">
+                        <input style={s.input} value={firstName} onChange={e => setFirstName(e.target.value)} />
+                      </Field>
+                      <Field label="Last Name">
+                        <input style={s.input} value={lastName} onChange={e => setLastName(e.target.value)} />
+                      </Field>
+                    </div>
+                    <div style={s.fieldRow}>
+                      <Field label="Age">
+                        <input style={s.input} type="number" min="1" value={age} onChange={e => setAge(e.target.value)} />
+                      </Field>
+                      <Field label="Major (optional)">
+                        <input style={s.input} value={major} onChange={e => setMajor(e.target.value)} placeholder="e.g. Computer Science" />
+                      </Field>
+                    </div>
+                  </>
+                )}
+
+                {profileStatus && (
+                  <p style={profileStatus.ok ? s.successText : s.errorText}>{profileStatus.msg}</p>
+                )}
+
+                {role !== 'helpdesk' && (
+                  <div style={s.actions}>
+                    <button style={{...s.saveButton, opacity: saving ? 0.6 : 1 }} onClick={handleSaveProfile} disabled={saving}>
+                      {saving ? 'Saving…' : 'Save Changes'}
+                    </button>
                   </div>
-
-                  <label style={styles.field}>
-                    <span style={styles.label}>Email Address</span>
-                    <input style={{ ...styles.input, ...styles.readOnlyInput }} value={form.email} readOnly />
-                  </label>
-
-                  <label style={styles.field}>
-                    <span style={styles.label}>Phone Number</span>
-                    <input
-                      style={styles.input}
-                      value={form.phone}
-                      onChange={(event) => updateField('phone', event.target.value)}
-                    />
-                  </label>
-                </section>
-
-                <section style={{ ...styles.section, ...styles.sectionDivider }}>
-                  <h2 style={styles.sectionTitle}>Address</h2>
-                  <div style={styles.addressGrid}>
-                    <label style={styles.field}>
-                      <span style={styles.label}>Street No.</span>
-                      <input
-                        style={styles.input}
-                        value={form.streetNumber}
-                        onChange={(event) => updateField('streetNumber', event.target.value)}
-                      />
-                    </label>
-
-                    <label style={styles.field}>
-                      <span style={styles.label}>Street Name</span>
-                      <input
-                        style={styles.input}
-                        value={form.streetName}
-                        onChange={(event) => updateField('streetName', event.target.value)}
-                      />
-                    </label>
-                  </div>
-
-                  <div style={styles.locationGrid}>
-                    <label style={styles.field}>
-                      <span style={styles.label}>City</span>
-                      <input
-                        style={styles.input}
-                        value={form.city}
-                        onChange={(event) => updateField('city', event.target.value)}
-                      />
-                    </label>
-
-                    <label style={styles.field}>
-                      <span style={styles.label}>State</span>
-                      <input
-                        style={styles.input}
-                        value={form.state}
-                        onChange={(event) => updateField('state', event.target.value)}
-                      />
-                    </label>
-
-                    <label style={styles.field}>
-                      <span style={styles.label}>Zip</span>
-                      <input
-                        style={styles.input}
-                        value={form.zipCode}
-                        onChange={(event) => updateField('zipCode', event.target.value)}
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <section style={{ ...styles.section, ...styles.sectionDivider }}>
-                  <h2 style={styles.sectionTitle}>Academic Info</h2>
-                  <div style={styles.fieldRow}>
-                    <label style={styles.field}>
-                      <span style={styles.label}>Major</span>
-                      <input
-                        style={styles.input}
-                        value={form.major}
-                        onChange={(event) => updateField('major', event.target.value)}
-                      />
-                    </label>
-
-                    <label style={styles.field}>
-                      <span style={styles.label}>Age</span>
-                      <input
-                        style={styles.input}
-                        type="number"
-                        min="18"
-                        value={form.age}
-                        onChange={(event) => updateField('age', event.target.value)}
-                      />
-                    </label>
-                  </div>
-                </section>
-              </>
+                )}
+              </section>
             )}
 
             {activeTab === 'payment' && (
-              <section style={styles.section}>
-                <h2 style={styles.sectionTitle}>Payment Method</h2>
-                <div style={styles.paymentPreview}>
-                  <span>{form.cardType || 'Card'}</span>
-                  <strong>**** {form.cardLastFour || '0000'}</strong>
-                </div>
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>Payment Method</h2>
+                {payment ? (
+                  <>
+                    <div style={s.paymentPreview}>
+                      <span>{payment.card_type}</span>
+                      <strong>**** {payment.last_four}</strong>
+                    </div>
+                    <div style={s.fieldRow}>
+                      <Field label="Card Type"><span style={s.readonlyValue}>{payment.card_type}</span></Field>
+                      <Field label="Last Four"><span style={s.readonlyValue}>{payment.last_four}</span></Field>
+                    </div>
+                    <div style={s.fieldRow}>
+                      <Field label="Expiry Month"><span style={s.readonlyValue}>{String(payment.expire_month).padStart(2, '0')}</span></Field>
+                      <Field label="Expiry Year"><span style={s.readonlyValue}>{payment.expire_year}</span></Field>
+                    </div>
+                    <p style={s.hint}>To update payment info, submit a helpdesk request.</p>
+                  </>
+                ) : (
+                  <p style={s.muted}>No payment method on file.</p>
+                )}
+              </section>
+            )}
 
-                <div style={styles.fieldRow}>
-                  <label style={styles.field}>
-                    <span style={styles.label}>Card Type</span>
-                    <select
-                      style={styles.input}
-                      value={form.cardType}
-                      onChange={(event) => updateField('cardType', event.target.value)}
-                    >
-                      <option value="Visa">Visa</option>
-                      <option value="Mastercard">Mastercard</option>
-                      <option value="Discover">Discover</option>
-                      <option value="American Express">American Express</option>
-                    </select>
-                  </label>
+            {/* ── Seller Info tab ── */}
+            {activeTab === 'sellerInfo' && (
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>Seller Payout Info</h2>
+                <Field label="Bank Routing Number">
+                  <input style={s.input} value={routing} onChange={e => setRouting(e.target.value)} placeholder="9-digit routing number" />
+                </Field>
+                <Field label="Bank Account Number">
+                  <input style={s.input} value={account} onChange={e => setAccount(e.target.value)} placeholder="Account number" />
+                </Field>
 
-                  <label style={styles.field}>
-                    <span style={styles.label}>Last Four</span>
-                    <input
-                      style={styles.input}
-                      value={form.cardLastFour}
-                      maxLength={4}
-                      onChange={(event) => updateField('cardLastFour', event.target.value.replace(/\D/g, ''))}
-                    />
-                  </label>
-                </div>
-
-                <div style={styles.fieldRow}>
-                  <label style={styles.field}>
-                    <span style={styles.label}>Expire Month</span>
-                    <input
-                      style={styles.input}
-                      value={form.expireMonth}
-                      maxLength={2}
-                      onChange={(event) => updateField('expireMonth', event.target.value.replace(/\D/g, ''))}
-                    />
-                  </label>
-
-                  <label style={styles.field}>
-                    <span style={styles.label}>Expire Year</span>
-                    <input
-                      style={styles.input}
-                      value={form.expireYear}
-                      maxLength={4}
-                      onChange={(event) => updateField('expireYear', event.target.value.replace(/\D/g, ''))}
-                    />
-                  </label>
+                {profileStatus && (
+                  <p style={profileStatus.ok ? s.successText : s.errorText}>{profileStatus.msg}</p>
+                )}
+                <div style={s.actions}>
+                  <button style={{...s.saveButton, opacity: saving ? 0.6 : 1 }} onClick={handleSaveProfile} disabled={saving}>
+                    {saving ? 'Saving…' : 'Save Changes'}
+                  </button>
                 </div>
               </section>
             )}
 
             {activeTab === 'password' && (
-              <section style={styles.section}>
-                <h2 style={styles.sectionTitle}>Password</h2>
-                <label style={styles.field}>
-                  <span style={styles.label}>Current Password</span>
-                  <input
-                    style={styles.input}
-                    type="password"
-                    value={form.currentPassword}
-                    onChange={(event) => updateField('currentPassword', event.target.value)}
-                  />
-                </label>
+              <section style={s.section}>
+                <h2 style={s.sectionTitle}>Change Password</h2>
+                <Field label="New Password">
+                  <input style={s.input} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="••••••••" />
+                </Field>
+                <Field label="Confirm New Password">
+                  <input style={s.input} type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" />
+                </Field>
 
-                <label style={styles.field}>
-                  <span style={styles.label}>New Password</span>
-                  <input
-                    style={styles.input}
-                    type="password"
-                    value={form.newPassword}
-                    onChange={(event) => updateField('newPassword', event.target.value)}
-                  />
-                </label>
-
-                <label style={styles.field}>
-                  <span style={styles.label}>Confirm New Password</span>
-                  <input
-                    style={styles.input}
-                    type="password"
-                    value={form.confirmPassword}
-                    onChange={(event) => updateField('confirmPassword', event.target.value)}
-                  />
-                </label>
-              </section>
-            )}
-
-            {activeTab === 'sellerInfo' && (
-              <section style={styles.section}>
-                <h2 style={styles.sectionTitle}>Seller Payout Info</h2>
-                <div style={styles.callout}>
-                  Balance and payout updates are local only until backend account routes are added.
+                {pwStatus && (
+                  <p style={pwStatus.ok ? s.successText : s.errorText}>{pwStatus.msg}</p>
+                )}
+                <div style={s.actions}>
+                  <button style={{...s.saveButton, opacity: savingPw ? 0.6 : 1 }} onClick={handleChangePassword} disabled={savingPw}>
+                    {savingPw ? 'Updating…' : 'Update Password'}
+                  </button>
                 </div>
-
-                <label style={styles.field}>
-                  <span style={styles.label}>Bank Routing Number</span>
-                  <input
-                    style={styles.input}
-                    value={form.bankRoutingNumber}
-                    maxLength={9}
-                    onChange={(event) => updateField('bankRoutingNumber', event.target.value.replace(/\D/g, ''))}
-                  />
-                </label>
-
-                <label style={styles.field}>
-                  <span style={styles.label}>Bank Account Number</span>
-                  <input
-                    style={styles.input}
-                    value={form.bankAccountNumber}
-                    maxLength={17}
-                    onChange={(event) => updateField('bankAccountNumber', event.target.value.replace(/\D/g, ''))}
-                  />
-                </label>
               </section>
             )}
-
-            {status && (
-              <p style={status.includes('saved') ? styles.successText : styles.errorText}>{status}</p>
-            )}
-
-            <div style={styles.actions}>
-              <button style={styles.saveButton} type="submit">
-                Save Locally
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       </main>
     </div>
@@ -453,9 +303,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '20px',
     fontWeight: 900,
   },
-  profileTitleBlock: {
-    minWidth: 0,
-  },
+  profileTitleBlock: {minWidth: 0 },
   eyebrow: {
     margin: '0 0 6px',
     color: '#5ba4d4',
@@ -528,10 +376,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px',
     fontWeight: 900,
   },
-  tabIconActive: {
-    background: '#5ba4d4',
-    color: '#0b1521',
-  },
+  tabIconActive: {background: '#5ba4d4', color: '#0b1521' },
   card: {
     minHeight: '510px',
     padding: '22px',
@@ -548,6 +393,7 @@ const styles: Record<string, CSSProperties> = {
     paddingTop: '20px',
     borderTop: '1px solid #293d56',
   },
+  section: {margin: 0 },
   sectionTitle: {
     margin: '0 0 18px',
     color: '#edf3f8',
