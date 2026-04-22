@@ -26,7 +26,6 @@ def submit_ticket():
 
 @helpdesk_bp.route('/helpdesk/tickets', methods=['GET'])
 def get_tickets():
-    """Returns tickets for a helpdesk member: their own + all unclaimed."""
     staff_email = request.args.get('staff_email', '').strip()
     if not staff_email:
         return jsonify({'error': 'staff_email required'}), 400
@@ -62,7 +61,6 @@ def complete_ticket(request_id: int):
 
 @helpdesk_bp.route('/helpdesk/categories', methods=['GET'])
 def get_all_categories():
-    """Returns every category name for the parent selector."""
     cats = Categories.query.order_by(Categories.category_name).all()
     return jsonify([c.category_name for c in cats]), 200
 
