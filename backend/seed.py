@@ -130,7 +130,7 @@ def init_db():
         raw = parse("testdb/Categories.csv")
         csv_names = set(raw['category_name'])
         csv_parents = set(p for p in raw['parent_category'] if p is not None)
-        # Categories that appear only as parents in the CSV have no row of their own —
+        # Categories that appear only as parents in the CSV have no row of their own
         # they are top-level and should sit directly under the 'All' root.
         top_level = csv_parents - csv_names
 
